@@ -10,6 +10,7 @@ import {
   Gauge,
   Layers3,
   ShieldAlert,
+  Waypoints,
 } from "lucide-react";
 
 import { SafaHeader } from "@/components/safa-header";
@@ -37,6 +38,17 @@ function showScore(value: number | string | null) {
   const parsed = numberValue(value);
   return parsed === null ? "—" : parsed.toFixed(1);
 }
+
+const profileLabels: Record<string, string> = {
+  unclassified: "A classificar",
+  brick_fii: "Tijolo",
+  receivables_fii: "Recebíveis",
+  hybrid_fii: "Híbrido",
+  fof_fii: "Fundo de fundos",
+  development_fii: "Desenvolvimento",
+  fiagro: "Fiagro",
+  infrastructure_fund: "Infraestrutura",
+};
 
 export default async function FundPage({ params }: FundPageProps) {
   const { ticker } = await params;
@@ -95,6 +107,20 @@ export default async function FundPage({ params }: FundPageProps) {
               <p className="mt-3 text-xs leading-5 text-slate-500">Notas permanecem bloqueadas até todos os critérios, dados e fontes passarem pela dupla revisão.</p>
             </div>
           </div>
+        </section>
+
+        <section className="mb-6">
+          <Card className="gap-3 border-white/8 bg-[#0b1826] py-5 shadow-none">
+            <CardContent className="px-5">
+              <p className="flex items-center gap-2 text-xs text-slate-500"><Waypoints className="size-3.5 text-cyan-300" /> Perfil metodológico</p>
+              <p className="mt-2 text-base font-medium text-white">{profileLabels[instrument.analysis_profile] ?? instrument.analysis_profile}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">
+                {instrument.analysis_profile_status === "verified"
+                  ? "Perfil verificado; os critérios específicos podem ser aplicados."
+                  : "Pendente de verificação documental. Notas, veredito e conclusão permanecem bloqueados."}
+              </p>
+            </CardContent>
+          </Card>
         </section>
 
         <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-7">

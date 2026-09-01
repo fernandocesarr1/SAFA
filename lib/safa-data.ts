@@ -13,6 +13,10 @@ export type QueueItem = {
   eligibility_source_url: string | null;
   eligibility_verified_at: string | null;
   universe_status: string;
+  analysis_profile: string;
+  analysis_profile_status: string;
+  analysis_profile_source_url: string | null;
+  analysis_profile_verified_at: string | null;
   analysis_run_id: number | null;
   version: number | null;
   methodology_version: string | null;
@@ -158,17 +162,10 @@ export type RankingEntry = {
 };
 
 const initialTickers = [
-  "HGLG11",
-  "BTLG11",
-  "HSML11",
-  "XPML11",
-  "LVBI11",
-  "FATN11",
-  "ALZR11",
-  "RBVA11",
-  "VILG11",
-  "GGRC11",
-];
+  "TRXF11", "GGRC11", "RBRY11", "MXRF11", "AAZQ11", "SNEL11", "GARE11",
+  "KNSC11", "CPSH11", "HGCR11", "BRCR11", "NSLU11", "RBVA11", "TGAR11",
+  "HGLG11", "BTLG11", "HSML11", "XPML11", "LVBI11", "FATN11", "ALZR11", "VILG11",
+] as const;
 
 const fallbackQueue: QueueItem[] = initialTickers.map((ticker, index) => ({
   instrument_id: index + 1,
@@ -179,12 +176,16 @@ const fallbackQueue: QueueItem[] = initialTickers.map((ticker, index) => ({
   segment: null,
   segment_key: null,
   queue_position: index + 1,
-  eligible_retail: true,
+  eligible_retail: false,
   eligibility_status: "unverified",
   eligibility_confidence: "low",
   eligibility_source_url: null,
   eligibility_verified_at: null,
   universe_status: "queued",
+  analysis_profile: "unclassified",
+  analysis_profile_status: "pending_verification",
+  analysis_profile_source_url: null,
+  analysis_profile_verified_at: null,
   analysis_run_id: index + 1,
   version: 1,
   methodology_version: "deep-max-v2",
@@ -341,7 +342,12 @@ export async function getCurrentRanking(): Promise<RankingEntry[]> {
 export async function getUniverseStats(): Promise<UniverseStats> {
   try {
     const rows = await select<UniverseStats>("v_universe_stats?select=*&limit=1");
-    return rows[0] ?? { fii_registered: 0, fii_retail_verified: 0, fii_queued: 0, fii_completed: 0 };
+    return rows[0] ?? {
+      fii_registered: 0,
+      fii_retail_verified: 0,
+      fii_queued: 0,
+      fii_completed: 0,
+    };
   } catch {
     return {
       fii_registered: fallbackQueue.length,

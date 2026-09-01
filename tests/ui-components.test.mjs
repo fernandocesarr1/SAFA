@@ -124,7 +124,8 @@ test("keeps the Deep Max v2 methodology exhaustive, weighted and non-duplicated"
 test("keeps database-level completion guards in the canonical schema", async () => {
   const base = await readFile(path.join(root, "supabase/schema.sql"), "utf8");
   const patch = await readFile(path.join(root, "supabase/deep_max_v2.sql"), "utf8");
-  const schema = `${base}\n${patch}`;
+  const prioritizedUniverse = await readFile(path.join(root, "supabase/prioritized_analysis_universe_v1.sql"), "utf8");
+  const schema = `${base}\n${patch}\n${prioritizedUniverse}`;
 
   assert.match(schema, /create view public\.v_analysis_readiness/i);
   assert.match(schema, /validate_analysis_run_completion/i);
@@ -143,4 +144,30 @@ test("keeps database-level completion guards in the canonical schema", async () 
   assert.match(schema, /new\.income_score \* 0\.25/i);
   assert.match(schema, /analysis_runs_one_active_idx/i);
   assert.match(schema, /somente analise Deep Max integralmente concluida entra no ranking/i);
+  assert.match(schema, /validate_analysis_profile/i);
+  assert.match(schema, /perfil metodologico precisa ser verificado/i);
+  assert.match(schema, /analysis_profile_status/i);
+});
+
+test("keeps only prioritized tickers without personal, financial or fake analysis data", async () => {
+  const dataModule = await readFile(path.join(root, "lib/safa-data.ts"), "utf8");
+  const migration = await readFile(path.join(root, "supabase/prioritized_analysis_universe_v1.sql"), "utf8");
+
+  for (const ticker of [
+    "TRXF11", "GGRC11", "RBRY11", "MXRF11", "AAZQ11", "SNEL11", "GARE11",
+    "KNSC11", "CPSH11", "HGCR11", "BRCR11", "NSLU11", "RBVA11", "TGAR11",
+  ]) {
+    assert.match(dataModule, new RegExp(ticker));
+    assert.match(migration, new RegExp(ticker));
+  }
+
+  assert.match(migration, /\('TRXF11', 1\)/i);
+  assert.match(migration, /\('KNSC11', 8\)/i);
+  assert.match(migration, /methodology_version, status\s*\)\s*select instrument\.id, 1, 'deep-max-v2', 'backlog'/i);
+  assert.doesNotMatch(migration, /in_portfolio|in_watchlist|personal_universe/i);
+  assert.doesNotMatch(migration, /holding_quantity/i);
+  assert.doesNotMatch(migration, /average_cost/i);
+  assert.doesNotMatch(migration, /position_snapshots/i);
+  assert.doesNotMatch(migration, /quality_score\s*=\s*[0-9]/i);
+  assert.doesNotMatch(migration, /verdict\s*=\s*'/i);
 });

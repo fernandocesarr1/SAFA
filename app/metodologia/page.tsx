@@ -1,4 +1,4 @@
-import { AlertTriangle, BookOpenCheck, CheckCircle2, Database, Scale, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BookOpenCheck, CheckCircle2, Database, Scale, ShieldCheck, Waypoints } from "lucide-react";
 
 import { SafaHeader } from "@/components/safa-header";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/deep-max-methodology";
 
 const gates = [
+  `Perfil metodológico confirmado por fonte e data antes de ativar a régua específica`,
   `Elegibilidade do investidor comum confirmada em fontes de mercado e regulatória`,
   `${deepMaxSections.length} seções e 80 critérios universais revisados em duas passagens`,
   `${deepMaxDocumentScopes.length} escopos documentais pesquisados e conciliados`,
@@ -20,7 +21,7 @@ const gates = [
   `${deepMaxDocumentMinimums.classifiedDistributions} distribuições classificadas em recorrente, mista ou extraordinária`,
   `${deepMaxDocumentMinimums.pricePoints} pregões cobrindo pelo menos ${deepMaxDocumentMinimums.priceHistoryYears} anos`,
   `${deepMaxDocumentMinimums.universalMetrics} métricas universais e 5 métricas específicas do segmento`,
-  `Imóveis, locatários, contratos, dívidas, valuation, premissas, riscos e gatilhos estruturados`,
+  `Dados próprios do perfil, dívidas, valuation, premissas, riscos e gatilhos estruturados`,
   `${deepMaxDocumentMinimums.valuationScenarios} cenários, ${deepMaxDocumentMinimums.valuationAssumptions} premissas e ao menos um contramodelo`,
   `Caso contrário, falsificadores e recência dos dados verificados antes da conclusão`,
 ];
@@ -37,9 +38,14 @@ export default function MethodologyPage() {
           </div>
           <h1 className="mt-5 max-w-4xl font-serif text-3xl text-white sm:text-5xl">O que precisa existir antes de uma nota.</h1>
           <p className="mt-4 max-w-4xl text-sm leading-7 text-slate-300 sm:text-base">
-            O SAFA não considera uma análise completa porque há um relatório, um múltiplo ou uma opinião. A conclusão exige cobertura documental, dados estruturados, duas revisões, contramodelo e regras iguais para todos os fundos.
+            O SAFA não considera uma análise completa porque há um relatório, um múltiplo ou uma opinião. A conclusão exige cobertura documental, dados estruturados, duas revisões, contramodelo e regras iguais para fundos do mesmo perfil.
           </p>
         </section>
+
+        <div className="mb-6 flex gap-3 rounded-xl border border-cyan-300/12 bg-cyan-300/[0.04] p-4 text-sm leading-6 text-cyan-50/85">
+          <Waypoints className="mt-0.5 size-4 shrink-0 text-cyan-300" />
+          O universo pode reunir tijolo, recebíveis, híbridos, desenvolvimento, Fiagro e infraestrutura. O perfil é um bloqueio de banco: sem verificação, não há nota nem veredito.
+        </div>
 
         <section className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {deepMaxScoreWeights.map((dimension) => (
@@ -119,8 +125,8 @@ export default function MethodologyPage() {
 
           <Card className="border-white/8 bg-[#0b1826] shadow-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white"><Scale className="size-4 text-teal-300" /> Overlay por segmento</CardTitle>
-              <CardDescription className="text-slate-400">A mesma régua universal recebe cinco testes próprios do negócio.</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-white"><Scale className="size-4 text-teal-300" /> Overlay por perfil e segmento</CardTitle>
+              <CardDescription className="text-slate-400">A régua universal recebe testes próprios do negócio; os overlays abaixo são os já versionados para tijolo.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {Object.entries(deepMaxSegmentOverlays).map(([code, overlay]) => (

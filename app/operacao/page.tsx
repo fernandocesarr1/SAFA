@@ -10,6 +10,7 @@ import {
   Gauge,
   History,
   LockKeyhole,
+  Waypoints,
 } from "lucide-react";
 
 import { SafaHeader } from "@/components/safa-header";
@@ -198,8 +199,17 @@ export default async function OperationPage({ searchParams }: OperationPageProps
     selected.confidence_score !== null &&
     selected.action_new_money !== null &&
     selected.action_existing_holder !== null;
+  const profileComplete = selected.analysis_profile_status === "verified" && selected.analysis_profile !== "unclassified";
 
   const gates = [
+    {
+      label: "Perfil metodológico verificado",
+      detail: profileComplete
+        ? `Perfil ${selected.analysis_profile} confirmado por fonte e data.`
+        : "Primeiro, confirmar se o fundo é tijolo, recebíveis, híbrido, desenvolvimento, agro ou infraestrutura.",
+      complete: profileComplete,
+      icon: Waypoints,
+    },
     {
       label: "Acesso do investidor comum verificado",
       detail: eligibilityComplete ? "Mercado, regulador, público-alvo e recência confirmados." : "Faltam duas fontes e verificação recente de elegibilidade.",
@@ -243,15 +253,17 @@ export default async function OperationPage({ searchParams }: OperationPageProps
       icon: Gauge,
     },
     {
-      label: "Dados normalizados e contramodelo",
-      detail: `${propertyCount} imóveis · ${tenantCount} locatários · ${leaseCount} contratos · ${scenarioCount}/3 cenários · ${assumptionCount}/12 premissas · ${riskCount}/5 riscos`,
-      complete: structuredComplete,
+      label: "Dados específicos do perfil e contramodelo",
+      detail: profileComplete
+        ? `${propertyCount} imóveis · ${tenantCount} locatários · ${leaseCount} contratos · ${scenarioCount}/3 cenários · ${assumptionCount}/12 premissas · ${riskCount}/5 riscos`
+        : "A régua estruturada correta só é ativada após a classificação metodológica.",
+      complete: profileComplete && structuredComplete,
       icon: Database,
     },
     {
       label: "Veredito e notas liberados",
       detail: finalFieldsComplete ? "Conclusão preenchida após todos os bloqueios." : "Permanece bloqueado até o esgotamento das etapas anteriores.",
-      complete: finalFieldsComplete && Boolean(readiness?.completion_ready),
+      complete: profileComplete && finalFieldsComplete && Boolean(readiness?.completion_ready),
       icon: LockKeyhole,
     },
   ];
@@ -311,7 +323,9 @@ export default async function OperationPage({ searchParams }: OperationPageProps
               </form>
               <div className="flex gap-3 rounded-xl border border-amber-300/12 bg-amber-300/[0.045] p-4 text-xs leading-5 text-amber-100/90">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />
-                {readiness?.research_exhausted && !readiness.completion_ready
+                {!profileComplete
+                  ? "Perfil metodológico pendente. O banco bloqueia notas e veredito até a classificação ser confirmada com fonte e data."
+                  : readiness?.research_exhausted && !readiness.completion_ready
                   ? "A pesquisa foi esgotada, mas há evidência crítica indisponível: só é permitida a conclusão sem notas como dados insuficientes."
                   : readiness?.completion_ready
                     ? "Todos os bloqueios estão satisfeitos; notas e veredito podem ser registrados para esta data-base."

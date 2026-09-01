@@ -55,7 +55,7 @@ export default async function Home({ searchParams }: HomeProps) {
                   <Sparkles className="size-3" /> Deep Max v2
                 </Badge>
                 <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-300">
-                  FIIs de tijolo · investidor comum
+                  FIIs · universo prioritário
                 </Badge>
               </div>
               <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-teal-300/80">Central de decisão</p>
@@ -63,7 +63,7 @@ export default async function Home({ searchParams }: HomeProps) {
                 Analisar cada fundo até esgotá-lo. Depois, comparar com honestidade.
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                O SAFA separa qualidade, renda sustentável, preço e risco. Nenhum fundo recebe veredito final antes da leitura documental e das duas passagens críticas.
+                O SAFA começa pelos fundos escolhidos para pesquisa, separando qualidade, renda sustentável, preço e risco. Nenhum fundo recebe veredito final antes da leitura documental e das duas passagens críticas.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Button asChild className="bg-teal-300 text-[#06121d] hover:bg-teal-200">
@@ -100,7 +100,7 @@ export default async function Home({ searchParams }: HomeProps) {
               </div>
               <div className="flex items-start gap-3 rounded-xl border border-amber-300/12 bg-amber-300/[0.045] p-4 text-sm leading-6 text-amber-100/90">
                 <ShieldCheck className="mt-0.5 size-4 shrink-0 text-amber-300" />
-                Nota alta não significa probabilidade de ganho. O sistema mostra confiança e riscos separadamente.
+                O perfil metodológico de cada novo fundo será verificado antes das notas; recebíveis, tijolo, híbridos e infraestrutura não usam uma régua indevida.
               </div>
             </CardContent>
           </Card>
@@ -132,8 +132,8 @@ export default async function Home({ searchParams }: HomeProps) {
           <div className="flex flex-col gap-4 border-b border-white/7 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-300/70">Trabalho atual</p>
-              <h2 className="mt-1 text-xl font-semibold text-white">Fila Deep Max</h2>
-              <p className="mt-1 text-sm text-slate-400">Um fundo por vez; nenhuma conclusão provisória aparece como definitiva.</p>
+              <h2 className="mt-1 text-xl font-semibold text-white">Fila priorizada Deep Max</h2>
+              <p className="mt-1 text-sm text-slate-400">Os fundos escolhidos entram primeiro; nenhuma conclusão provisória aparece como definitiva.</p>
             </div>
             <form className="relative w-full sm:w-72" action="/" method="get">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
@@ -151,7 +151,7 @@ export default async function Home({ searchParams }: HomeProps) {
             <table className="w-full min-w-[850px] text-sm">
               <thead className="bg-white/[0.02] text-left text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
                 <tr>
-                  <th className="px-6 py-3">Posição</th>
+                  <th className="px-6 py-3">Fila</th>
                   <th className="px-4 py-3">FII</th>
                   <th className="px-4 py-3">Etapa</th>
                   <th className="px-4 py-3">Cobertura</th>
@@ -171,7 +171,11 @@ export default async function Home({ searchParams }: HomeProps) {
                         <Link href={`/fundos/${item.ticker}`} className="font-semibold text-white hover:text-teal-200">
                           {item.ticker}
                         </Link>
-                        <p className="mt-0.5 text-xs text-slate-500">{item.segment ?? "Segmento a confirmar"}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {item.analysis_profile_status === "verified"
+                            ? item.segment ?? "Perfil verificado"
+                            : "Perfil metodológico a verificar"}
+                        </p>
                       </td>
                       <td className="px-4 py-4"><StatusPill status={item.status} /></td>
                       <td className="px-4 py-4">
