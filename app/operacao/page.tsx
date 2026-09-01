@@ -1,0 +1,378 @@
+import Link from "next/link";
+import {
+  AlertTriangle,
+  ArrowRight,
+  BookOpenCheck,
+  CheckCircle2,
+  CircleDashed,
+  Database,
+  FileText,
+  Gauge,
+  History,
+  LockKeyhole,
+} from "lucide-react";
+
+import { SafaHeader } from "@/components/safa-header";
+import { StatusPill } from "@/components/status-pill";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import {
+  deepMaxDocumentMinimums,
+  deepMaxSections,
+  getDeepMaxSection,
+} from "@/lib/deep-max-methodology";
+import {
+  getDocuments,
+  getQueue,
+  getReadiness,
+  getSections,
+  numberValue,
+} from "@/lib/safa-data";
+
+export const dynamic = "force-dynamic";
+
+type OperationPageProps = {
+  searchParams?: Promise<{ ticker?: string }>;
+};
+
+const completeDocumentStatuses = new Set(["complete", "unavailable"]);
+
+function normalizedTicker(value: string | undefined, fallback: string) {
+  const clean = (value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return clean || fallback;
+}
+
+function value(value: number | string | null | undefined) {
+  return numberValue(value) ?? 0;
+}
+
+function percentage(done: number, total: number) {
+  return total ? Math.min(100, (done / total) * 100) : 0;
+}
+
+function PassState({ status }: { status: string | undefined }) {
+  const complete = status === "complete";
+  const blocked = status === "blocked";
+  const active = status === "in_progress" || status === "reading";
+  const label = complete ? "Concluída" : blocked ? "Bloqueada" : active ? "Em curso" : "Pendente";
+  const classes = complete
+    ? "border-emerald-300/20 bg-emerald-300/8 text-emerald-200"
+    : blocked
+      ? "border-rose-300/20 bg-rose-300/8 text-rose-200"
+      : active
+        ? "border-cyan-300/20 bg-cyan-300/8 text-cyan-200"
+        : "border-white/10 bg-white/4 text-slate-400";
+
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${classes}`}>{label}</span>;
+}
+
+function GateCard({
+  label,
+  detail,
+  complete,
+  icon: Icon,
+}: {
+  label: string;
+  detail: string;
+  complete: boolean;
+  icon: typeof CheckCircle2;
+}) {
+  return (
+    <div className={`rounded-xl border p-4 ${complete ? "border-emerald-300/16 bg-emerald-300/[0.045]" : "border-white/7 bg-white/[0.02]"}`}>
+      <div className="flex items-start gap-3">
+        <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${complete ? "bg-emerald-300/10 text-emerald-200" : "bg-white/5 text-slate-500"}`}>
+          <Icon className="size-4" />
+        </span>
+        <div>
+          <p className="text-sm font-medium text-white">{label}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-400">{detail}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default async function OperationPage({ searchParams }: OperationPageProps) {
+  const params = (await searchParams) ?? {};
+  const queue = await getQueue();
+  if (!queue.length) return null;
+
+  const ticker = normalizedTicker(params.ticker, queue[0].ticker);
+  const selected = queue.find((item) => item.ticker === ticker) ?? queue[0];
+  const [sections, documents, readiness] = await Promise.all([
+    getSections(selected.analysis_run_id),
+    getDocuments(selected.analysis_run_id),
+    getReadiness(selected.analysis_run_id),
+  ]);
+
+  const sectionTotal = readiness ? value(readiness.section_total) : sections.length;
+  const firstSections = readiness
+    ? value(readiness.first_sections_complete)
+    : sections.filter((section) => section.first_pass_status === "complete").length;
+  const secondSections = readiness
+    ? value(readiness.second_sections_complete)
+    : sections.filter((section) => section.second_pass_status === "complete").length;
+  const documentsTotal = readiness ? value(readiness.documents_total) : documents.length;
+  const firstDocuments = readiness
+    ? value(readiness.first_documents_complete)
+    : documents.filter((document) => completeDocumentStatuses.has(document.first_pass_status ?? "pending")).length;
+  const secondDocuments = readiness
+    ? value(readiness.second_documents_complete)
+    : documents.filter((document) => completeDocumentStatuses.has(document.second_pass_status ?? "pending")).length;
+  const managementReports = readiness
+    ? value(readiness.management_reports)
+    : documents.filter((document) => document.document_type === "management_report").length;
+  const financialStatements = readiness
+    ? value(readiness.financial_statements)
+    : documents.filter((document) => document.document_type === "financial_statement").length;
+  const auditReports = readiness
+    ? value(readiness.audit_reports)
+    : documents.filter((document) => document.document_type === "audit_report").length;
+  const regulations = readiness
+    ? value(readiness.regulations)
+    : documents.filter((document) => document.document_type === "regulation").length;
+  const distributions = readiness ? value(readiness.distribution_count) : 0;
+  const prices = readiness ? value(readiness.price_count) : 0;
+  const metrics = readiness ? value(readiness.distinct_metric_count) : 0;
+  const pagesTotal = readiness ? value(readiness.pages_total) : documents.reduce((sum, document) => sum + (document.pages_total ?? 0), 0);
+  const firstPages = readiness ? value(readiness.first_pages_reviewed) : documents.reduce((sum, document) => sum + (document.first_pass_pages_reviewed ?? 0), 0);
+  const secondPages = readiness ? value(readiness.second_pages_reviewed) : documents.reduce((sum, document) => sum + (document.second_pass_pages_reviewed ?? 0), 0);
+
+  const documentsCatalogued =
+    managementReports >= deepMaxDocumentMinimums.managementReports &&
+    financialStatements >= deepMaxDocumentMinimums.financialStatements &&
+    auditReports >= deepMaxDocumentMinimums.auditReports &&
+    regulations >= deepMaxDocumentMinimums.regulations;
+  const documentPassesComplete =
+    documentsTotal > 0 &&
+    firstDocuments === documentsTotal &&
+    secondDocuments === documentsTotal &&
+    (pagesTotal === 0 || (firstPages >= pagesTotal && secondPages >= pagesTotal));
+  const historyComplete = distributions >= deepMaxDocumentMinimums.distributions;
+  const pricesComplete = prices >= deepMaxDocumentMinimums.pricePoints;
+  const metricsComplete = metrics >= deepMaxDocumentMinimums.distinctMetrics;
+  const firstPassComplete = sectionTotal === deepMaxSections.length && firstSections === sectionTotal;
+  const secondPassComplete = sectionTotal === deepMaxSections.length && secondSections === sectionTotal;
+  const finalFieldsComplete =
+    selected.verdict !== null &&
+    selected.quality_score !== null &&
+    selected.income_score !== null &&
+    selected.safety_score !== null &&
+    selected.opportunity_score !== null &&
+    selected.risk_score !== null &&
+    selected.confidence_score !== null;
+
+  const gates = [
+    {
+      label: "Escopo documental cadastrado",
+      detail: `${managementReports}/6 relatórios gerenciais · ${financialStatements}/1 demonstração · ${auditReports}/1 auditoria · ${regulations}/1 regulamento`,
+      complete: documentsCatalogued,
+      icon: FileText,
+    },
+    {
+      label: "Documentos lidos duas vezes",
+      detail: `${firstDocuments}/${documentsTotal} na primeira leitura · ${secondDocuments}/${documentsTotal} na releitura · ${firstPages}/${pagesTotal || "—"} e ${secondPages}/${pagesTotal || "—"} páginas`,
+      complete: documentPassesComplete,
+      icon: BookOpenCheck,
+    },
+    {
+      label: "Históricos quantitativos suficientes",
+      detail: `${distributions}/36 distribuições · ${prices}/500 preços · ${metrics}/8 métricas essenciais`,
+      complete: historyComplete && pricesComplete && metricsComplete,
+      icon: History,
+    },
+    {
+      label: "Primeira passagem integral",
+      detail: `${firstSections}/${sectionTotal || deepMaxSections.length} áreas concluídas`,
+      complete: firstPassComplete,
+      icon: Database,
+    },
+    {
+      label: "Segunda passagem crítica",
+      detail: `${secondSections}/${sectionTotal || deepMaxSections.length} áreas reavaliadas`,
+      complete: secondPassComplete,
+      icon: Gauge,
+    },
+    {
+      label: "Veredito e notas liberados",
+      detail: finalFieldsComplete ? "Conclusão preenchida após todos os bloqueios." : "Permanece bloqueado até o esgotamento das etapas anteriores.",
+      complete: finalFieldsComplete && Boolean(readiness?.completion_ready),
+      icon: LockKeyhole,
+    },
+  ];
+  const gatesComplete = gates.filter((gate) => gate.complete).length;
+  const operationalReadiness = percentage(gatesComplete, gates.length);
+
+  return (
+    <div className="min-h-screen bg-[#07111f] text-slate-100">
+      <SafaHeader />
+      <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <section className="mb-6 grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="rounded-2xl border border-white/8 bg-[linear-gradient(135deg,rgba(15,31,49,.97),rgba(7,21,34,.94))] p-6 sm:p-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="border-teal-300/25 bg-teal-300/8 text-teal-100">Central operacional</Badge>
+                  <StatusPill status={selected.status} />
+                  <Badge variant="outline" className="border-white/10 bg-white/4 text-slate-300">Fila #{selected.queue_position ?? "—"}</Badge>
+                </div>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-teal-300/75">Análise ativa</p>
+                <h1 className="mt-2 font-serif text-4xl text-white sm:text-5xl">{selected.ticker}</h1>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
+                  Controle de esgotamento da análise Deep Max. A fila indica ordem de trabalho, não qualidade nem recomendação.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button asChild variant="outline" className="border-white/12 bg-white/4 text-white hover:bg-white/8">
+                  <Link href={`/fundos/${selected.ticker}`}>Abrir ficha pública</Link>
+                </Button>
+                <Button asChild className="bg-teal-300 text-[#06121d] hover:bg-teal-200">
+                  <Link href={`/comparador?a=${selected.ticker}&b=${queue.find((item) => item.ticker !== selected.ticker)?.ticker ?? selected.ticker}`}>
+                    Comparar <ArrowRight />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <Card className="border-white/8 bg-[#0b1826] shadow-none">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-base text-white">
+                Prontidão operacional
+                <span className="font-mono text-2xl text-teal-200">{operationalReadiness.toFixed(0)}%</span>
+              </CardTitle>
+              <CardDescription className="text-slate-400">{gatesComplete}/{gates.length} bloqueios satisfeitos</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <Progress value={operationalReadiness} className="h-2.5 bg-slate-800 [&_[data-slot=progress-indicator]]:bg-teal-300" />
+              <form method="get" action="/operacao" className="grid gap-2">
+                <label htmlFor="ticker" className="text-xs text-slate-500">Fundo na mesa</label>
+                <div className="flex gap-2">
+                  <select id="ticker" name="ticker" defaultValue={selected.ticker} className="h-10 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#07131f] px-3 text-sm text-white outline-none focus:border-teal-300/40">
+                    {queue.map((item) => <option key={item.ticker} value={item.ticker}>{item.ticker}</option>)}
+                  </select>
+                  <Button type="submit" variant="outline" className="border-white/12 bg-white/4 text-white hover:bg-white/8">Abrir</Button>
+                </div>
+              </form>
+              <div className="flex gap-3 rounded-xl border border-amber-300/12 bg-amber-300/[0.045] p-4 text-xs leading-5 text-amber-100/90">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />
+                Ausência de dado não vira zero nem média presumida. Ela mantém o bloqueio aberto.
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="mb-6">
+          <div className="mb-4">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-300/70">Bloqueios de conclusão</p>
+            <h2 className="mt-1 text-xl font-semibold text-white">O que ainda impede o veredito</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {gates.map((gate) => <GateCard key={gate.label} {...gate} />)}
+          </div>
+        </section>
+
+        <section className="mb-6 overflow-hidden rounded-2xl border border-white/8 bg-[#0b1826]">
+          <div className="border-b border-white/7 px-5 py-5 sm:px-6">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-300/70">Comparativo Deep Max</p>
+            <h2 className="mt-1 text-xl font-semibold text-white">Matriz de esgotamento</h2>
+            <p className="mt-1 text-sm text-slate-400">As duas colunas representam trabalhos diferentes: construir a tese e depois tentar refutá-la.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] text-sm">
+              <thead className="bg-white/[0.02] text-left text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
+                <tr>
+                  <th className="px-6 py-3">Área</th>
+                  <th className="px-4 py-3">Escopo obrigatório</th>
+                  <th className="px-4 py-3">Primeira passagem</th>
+                  <th className="px-4 py-3">Segunda passagem</th>
+                  <th className="px-6 py-3 text-center">Nota</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sections.map((section, index) => {
+                  const definition = getDeepMaxSection(section.section_code);
+                  return (
+                    <tr key={section.id} className="border-t border-white/6 align-top">
+                      <td className="px-6 py-4">
+                        <div className="flex gap-3">
+                          <span className="mt-0.5 font-mono text-xs text-slate-600">{String(index + 1).padStart(2, "0")}</span>
+                          <div>
+                            <p className="font-medium text-white">{section.title}</p>
+                            <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{definition?.purpose}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <details className="group max-w-md">
+                          <summary className="cursor-pointer list-none text-xs font-medium text-teal-200 hover:text-teal-100">
+                            {definition?.criteria.length ?? 0} verificações obrigatórias
+                          </summary>
+                          <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+                            {definition?.criteria.map((criterion) => <li key={criterion} className="flex gap-2"><span className="mt-2 size-1 shrink-0 rounded-full bg-teal-300/60" />{criterion}</li>)}
+                          </ul>
+                        </details>
+                      </td>
+                      <td className="px-4 py-4"><PassState status={section.first_pass_status} /></td>
+                      <td className="px-4 py-4"><PassState status={section.second_pass_status} /></td>
+                      <td className="px-6 py-4 text-center font-mono text-slate-300">{section.score === null ? "—" : value(section.score).toFixed(1)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-white/8 bg-[#0b1826]">
+          <div className="flex flex-col gap-3 border-b border-white/7 px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-300/70">Controle página por página</p>
+              <h2 className="mt-1 text-xl font-semibold text-white">Documentos da análise</h2>
+              <p className="mt-1 text-sm text-slate-400">A URL é apenas referência; o SAFA guarda conclusões e contagens, não cópias dos arquivos públicos.</p>
+            </div>
+            <p className="font-mono text-xs text-slate-500">{documentsTotal} documentos · {pagesTotal || 0} páginas</p>
+          </div>
+
+          {documents.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead className="bg-white/[0.02] text-left text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
+                  <tr>
+                    <th className="px-6 py-3">Documento</th>
+                    <th className="px-4 py-3">Competência</th>
+                    <th className="px-4 py-3">Páginas</th>
+                    <th className="px-4 py-3">1ª leitura</th>
+                    <th className="px-6 py-3">2ª leitura</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {documents.map((document) => (
+                    <tr key={document.id} className="border-t border-white/6">
+                      <td className="px-6 py-4">
+                        {document.source_url ? <a href={document.source_url} target="_blank" rel="noreferrer" className="font-medium text-white hover:text-teal-200">{document.title}</a> : <p className="font-medium text-white">{document.title}</p>}
+                        <p className="mt-1 text-xs text-slate-500">{document.document_type}</p>
+                      </td>
+                      <td className="px-4 py-4 font-mono text-xs text-slate-400">{document.competence_date ?? "—"}</td>
+                      <td className="px-4 py-4 font-mono text-xs text-slate-400">{document.pages_total ?? "—"}</td>
+                      <td className="px-4 py-4"><PassState status={document.first_pass_status} /></td>
+                      <td className="px-6 py-4"><PassState status={document.second_pass_status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid place-items-center px-6 py-14 text-center">
+              <CircleDashed className="size-8 text-slate-600" />
+              <p className="mt-4 text-sm font-medium text-white">Nenhum documento cadastrado</p>
+              <p className="mt-2 max-w-xl text-xs leading-5 text-slate-500">O primeiro avanço real do {selected.ticker} será registrar os seis relatórios gerenciais mais recentes e o restante do escopo obrigatório.</p>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}

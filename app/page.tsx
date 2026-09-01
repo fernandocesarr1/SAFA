@@ -67,8 +67,8 @@ export default async function Home({ searchParams }: HomeProps) {
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Button asChild className="bg-teal-300 text-[#06121d] hover:bg-teal-200">
-                  <Link href={queue[0] ? `/fundos/${queue[0].ticker}` : "/#fila"}>
-                    Abrir primeira análise <ArrowRight />
+                  <Link href={queue[0] ? `/operacao?ticker=${queue[0].ticker}` : "/#fila"}>
+                    Abrir central de análise <ArrowRight />
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="border-white/12 bg-white/4 text-white hover:bg-white/8">
@@ -241,4 +241,3 @@ export default async function Home({ searchParams }: HomeProps) {
     </div>
   );
 }
-

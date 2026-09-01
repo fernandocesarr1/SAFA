@@ -50,9 +50,37 @@ export type SourceDocument = {
   title: string;
   source_url: string | null;
   competence_date: string | null;
+  published_at?: string | null;
   pages_total: number | null;
   pages_reviewed: number;
   reading_status: string;
+  first_pass_pages_reviewed?: number;
+  second_pass_pages_reviewed?: number;
+  first_pass_status?: string;
+  second_pass_status?: string;
+};
+
+export type AnalysisReadiness = {
+  analysis_run_id: number;
+  instrument_id: number;
+  ticker: string;
+  section_total: number;
+  first_sections_complete: number;
+  second_sections_complete: number;
+  documents_total: number;
+  management_reports: number;
+  financial_statements: number;
+  audit_reports: number;
+  regulations: number;
+  first_documents_complete: number;
+  second_documents_complete: number;
+  pages_total: number;
+  first_pages_reviewed: number;
+  second_pages_reviewed: number;
+  distribution_count: number;
+  price_count: number;
+  distinct_metric_count: number;
+  completion_ready: boolean;
 };
 
 export type RankingEntry = {
@@ -211,10 +239,22 @@ export async function getDocuments(runId: number | null): Promise<SourceDocument
   if (!runId) return [];
   try {
     return await select<SourceDocument>(
-      `source_documents?select=id,document_type,title,source_url,competence_date,pages_total,pages_reviewed,reading_status&analysis_run_id=eq.${runId}&order=competence_date.desc.nullslast`,
+      `source_documents?select=id,document_type,title,source_url,competence_date,published_at,pages_total,pages_reviewed,reading_status,first_pass_pages_reviewed,second_pass_pages_reviewed,first_pass_status,second_pass_status&analysis_run_id=eq.${runId}&order=competence_date.desc.nullslast`,
     );
   } catch {
     return [];
+  }
+}
+
+export async function getReadiness(runId: number | null): Promise<AnalysisReadiness | null> {
+  if (!runId) return null;
+  try {
+    const rows = await select<AnalysisReadiness>(
+      `v_analysis_readiness?select=*&analysis_run_id=eq.${runId}&limit=1`,
+    );
+    return rows[0] ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -233,4 +273,3 @@ export function numberValue(value: number | string | null | undefined) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
-

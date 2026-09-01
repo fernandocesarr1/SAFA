@@ -83,3 +83,32 @@ test("renders sidebar skeletons deterministically", async () => {
   assert.equal(first, second);
   assert.match(first, /--skeleton-width:70%/);
 });
+
+test("keeps the Deep Max methodology exhaustive and non-duplicated", async () => {
+  const { deepMaxSections, deepMaxDocumentMinimums } = await vite.ssrLoadModule(
+    "/lib/deep-max-methodology.ts",
+  );
+  const codes = deepMaxSections.map((section) => section.code);
+
+  assert.equal(deepMaxSections.length, 16);
+  assert.equal(new Set(codes).size, 16);
+  assert.ok(deepMaxSections.every((section) => section.criteria.length >= 5));
+  assert.deepEqual(deepMaxDocumentMinimums, {
+    managementReports: 6,
+    financialStatements: 1,
+    auditReports: 1,
+    regulations: 1,
+    distributions: 36,
+    pricePoints: 500,
+    distinctMetrics: 8,
+  });
+});
+
+test("keeps database-level completion guards in the canonical schema", async () => {
+  const schema = await readFile(path.join(root, "supabase/schema.sql"), "utf8");
+
+  assert.match(schema, /create or replace view public\.v_analysis_readiness/i);
+  assert.match(schema, /validate_analysis_run_completion/i);
+  assert.match(schema, /first_pass_pages_reviewed/i);
+  assert.match(schema, /second_pass_omissions/i);
+});
