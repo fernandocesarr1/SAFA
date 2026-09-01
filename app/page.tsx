@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { getCurrentRanking, getQueue, numberValue } from "@/lib/safa-data";
+import { getCurrentRanking, getQueue, getUniverseStats, numberValue } from "@/lib/safa-data";
 
 export const dynamic = "force-dynamic";
 
@@ -33,13 +33,13 @@ function score(value: number | string | null) {
 export default async function Home({ searchParams }: HomeProps) {
   const params = (await searchParams) ?? {};
   const query = (params.q ?? "").trim().toUpperCase();
-  const [queue, ranking] = await Promise.all([getQueue(), getCurrentRanking()]);
+  const [queue, ranking, universe] = await Promise.all([getQueue(), getCurrentRanking(), getUniverseStats()]);
   const filteredQueue = query
     ? queue.filter((item) => item.ticker.includes(query) || item.name?.toUpperCase().includes(query))
     : queue;
-  const completed = queue.filter((item) => item.status === "completed").length;
+  const completed = universe.fii_completed;
   const active = queue.filter((item) => item.status && !["backlog", "completed"].includes(item.status)).length;
-  const overallProgress = (completed / 180) * 100;
+  const overallProgress = universe.fii_registered ? (completed / universe.fii_registered) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-[#07111f] text-slate-100">
@@ -52,7 +52,7 @@ export default async function Home({ searchParams }: HomeProps) {
             <div className="relative">
               <div className="mb-5 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="border-teal-300/25 bg-teal-300/8 text-teal-100">
-                  <Sparkles className="size-3" /> Deep Max v1
+                  <Sparkles className="size-3" /> Deep Max v2
                 </Badge>
                 <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-300">
                   FIIs de tijolo · investidor comum
@@ -82,7 +82,7 @@ export default async function Home({ searchParams }: HomeProps) {
             <CardHeader>
               <CardTitle className="flex items-center justify-between gap-4 text-base text-white">
                 Cobertura do universo
-                <span className="font-mono text-2xl text-teal-200">{completed}/180</span>
+                <span className="font-mono text-2xl text-teal-200">{completed}/{universe.fii_registered}</span>
               </CardTitle>
               <CardDescription className="text-slate-400">Somente análises concluídas entram no ranking definitivo.</CardDescription>
             </CardHeader>
@@ -94,8 +94,8 @@ export default async function Home({ searchParams }: HomeProps) {
                   <p className="mt-1 text-2xl font-semibold text-white">{active}</p>
                 </div>
                 <div className="rounded-xl border border-white/7 bg-white/[0.025] p-4">
-                  <p className="text-xs text-slate-500">Na fila inicial</p>
-                  <p className="mt-1 text-2xl font-semibold text-white">{queue.length}</p>
+                  <p className="text-xs text-slate-500">Elegibilidade verificada</p>
+                  <p className="mt-1 text-2xl font-semibold text-white">{universe.fii_retail_verified}/{universe.fii_registered}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 rounded-xl border border-amber-300/12 bg-amber-300/[0.045] p-4 text-sm leading-6 text-amber-100/90">
@@ -108,9 +108,9 @@ export default async function Home({ searchParams }: HomeProps) {
 
         <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Blocos por análise", value: "16", detail: "fundamentos, documentos e preço", icon: FileSearch },
+            { label: "Critérios por análise", value: "80 + 5", detail: "universais mais overlay do segmento", icon: FileSearch },
             { label: "Passagens obrigatórias", value: "2", detail: "construção e contestação", icon: BookOpenCheck },
-            { label: "Seções preparadas", value: String(queue.length * 16), detail: "para os 10 primeiros FIIs", icon: Database },
+            { label: "Escopos controlados", value: "17", detail: "9 documentais e 8 estruturados", icon: Database },
             { label: "Ranking vigente", value: ranking.length ? String(ranking.length) : "—", detail: ranking.length ? "fundos classificados" : "aguardando análises completas", icon: CheckCircle2 },
           ].map(({ label, value, detail, icon: Icon }) => (
             <Card key={label} className="gap-3 border-white/8 bg-[#0b1826] py-5 shadow-none">
@@ -157,7 +157,7 @@ export default async function Home({ searchParams }: HomeProps) {
                   <th className="px-4 py-3">Cobertura</th>
                   <th className="px-4 py-3 text-center">Qualidade</th>
                   <th className="px-4 py-3 text-center">Renda</th>
-                  <th className="px-4 py-3 text-center">Oportunidade</th>
+                  <th className="px-4 py-3 text-center">Nota ponderada</th>
                   <th className="px-6 py-3 text-right">Ficha</th>
                 </tr>
               </thead>
@@ -182,7 +182,7 @@ export default async function Home({ searchParams }: HomeProps) {
                       </td>
                       <td className="px-4 py-4 text-center font-mono text-slate-300">{score(item.quality_score)}</td>
                       <td className="px-4 py-4 text-center font-mono text-slate-300">{score(item.income_score)}</td>
-                      <td className="px-4 py-4 text-center font-mono text-slate-300">{score(item.opportunity_score)}</td>
+                      <td className="px-4 py-4 text-center font-mono text-slate-300">{score(item.weighted_score)}</td>
                       <td className="px-6 py-4 text-right">
                         <Link href={`/fundos/${item.ticker}`} className="inline-flex items-center gap-1 text-xs font-medium text-teal-200 hover:text-teal-100">
                           Abrir <ArrowRight className="size-3" />
@@ -207,14 +207,14 @@ export default async function Home({ searchParams }: HomeProps) {
           <Card className="border-white/8 bg-[#0b1826] shadow-none">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-white"><CircleDashed className="size-4 text-teal-300" /> Regra para concluir um FII</CardTitle>
-              <CardDescription className="text-slate-400">O veredito só é liberado quando os quatro controles abaixo estiverem satisfeitos.</CardDescription>
+              <CardDescription className="text-slate-400">O veredito pontuável só é liberado quando todos os controles estiverem satisfeitos.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
               {[
-                "Documentos do escopo lidos integralmente",
-                "Fundamentos e históricos reconciliados",
-                "Valuation em três cenários",
-                "Segunda revisão crítica concluída",
+                "80 critérios + overlay revistos duas vezes",
+                "6 competências e 3 exercícios auditados",
+                "36 rendas classificadas e 750 pregões",
+                "Valuation, contramodelo, riscos e falsificadores",
               ].map((text) => (
                 <div key={text} className="flex gap-3 rounded-xl border border-white/7 bg-white/[0.02] p-4 text-sm leading-6 text-slate-300">
                   <span className="mt-1 size-2 shrink-0 rounded-full border border-teal-300/70" /> {text}
@@ -232,7 +232,7 @@ export default async function Home({ searchParams }: HomeProps) {
               <p>O ranking geral será formado apenas por fundos concluídos na mesma metodologia e atualizados para uma data de corte comparável.</p>
               <p className="rounded-xl border border-white/7 bg-white/[0.02] p-4 text-slate-400">Enquanto não houver análise completa, a ausência de nota significa “não avaliado” — nunca zero.</p>
               <Button asChild variant="outline" className="border-white/10 bg-transparent text-white hover:bg-white/6">
-                <Link href="/comparador">Ver estrutura do comparador <ArrowRight /></Link>
+                <Link href="/metodologia">Ver metodologia e pesos <ArrowRight /></Link>
               </Button>
             </CardContent>
           </Card>

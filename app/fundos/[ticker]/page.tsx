@@ -17,7 +17,8 @@ import { StatusPill } from "@/components/status-pill";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { getDocuments, getInstrument, getSections, numberValue } from "@/lib/safa-data";
+import { deepMaxScoreWeights } from "@/lib/deep-max-methodology";
+import { getDocuments, getInstrument, getReadiness, getSections, numberValue } from "@/lib/safa-data";
 
 export const dynamic = "force-dynamic";
 
@@ -42,15 +43,28 @@ export default async function FundPage({ params }: FundPageProps) {
   const instrument = await getInstrument(ticker);
   if (!instrument) notFound();
 
-  const [sections, documents] = await Promise.all([
+  const [sections, documents, readiness] = await Promise.all([
     getSections(instrument.analysis_run_id),
     getDocuments(instrument.analysis_run_id),
+    getReadiness(instrument.analysis_run_id),
   ]);
-  const firstComplete = sections.filter((section) => section.first_pass_status === "complete").length;
-  const secondComplete = sections.filter((section) => section.second_pass_status === "complete").length;
-  const pagesReviewed = documents.reduce((sum, document) => sum + document.pages_reviewed, 0);
-  const pagesTotal = documents.reduce((sum, document) => sum + (document.pages_total ?? 0), 0);
+  const firstComplete = readiness?.first_sections_complete ?? sections.filter((section) => section.first_pass_status === "complete").length;
+  const secondComplete = readiness?.second_sections_complete ?? sections.filter((section) => section.second_pass_status === "complete").length;
+  const criterionTotal = readiness?.criterion_total ?? 80;
+  const firstCriteria = readiness?.first_criteria_complete ?? 0;
+  const secondCriteria = readiness?.second_criteria_complete ?? 0;
+  const firstPages = readiness?.first_pages_reviewed ?? documents.reduce((sum, document) => sum + (document.first_pass_pages_reviewed ?? 0), 0);
+  const secondPages = readiness?.second_pages_reviewed ?? documents.reduce((sum, document) => sum + (document.second_pass_pages_reviewed ?? 0), 0);
+  const pagesTotal = readiness?.pages_total ?? documents.reduce((sum, document) => sum + (document.pages_total ?? 0), 0);
   const coverage = numberValue(instrument.coverage_pct) ?? 0;
+  const dimensionScores = [
+    [deepMaxScoreWeights[0], instrument.income_score],
+    [deepMaxScoreWeights[1], instrument.quality_score],
+    [deepMaxScoreWeights[2], instrument.balance_cash_score],
+    [deepMaxScoreWeights[3], instrument.management_governance_score],
+    [deepMaxScoreWeights[4], instrument.value_margin_score],
+    [deepMaxScoreWeights[5], instrument.technical_liquidity_score],
+  ] as const;
 
   return (
     <div className="min-h-screen bg-[#07111f] text-slate-100">
@@ -65,7 +79,7 @@ export default async function FundPage({ params }: FundPageProps) {
             <div>
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <StatusPill status={instrument.status} />
-                <Badge variant="outline" className="border-white/10 bg-white/4 text-slate-300">Deep Max v1</Badge>
+                <Badge variant="outline" className="border-white/10 bg-white/4 text-slate-300">Deep Max v2</Badge>
                 <Badge variant="outline" className="border-white/10 bg-white/4 text-slate-300">Fila #{instrument.queue_position ?? "—"}</Badge>
               </div>
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-300/70">Ficha integral do fundo</p>
@@ -78,27 +92,28 @@ export default async function FundPage({ params }: FundPageProps) {
                 <span className="font-mono text-teal-200">{coverage.toFixed(0)}%</span>
               </div>
               <Progress value={coverage} className="h-2.5 bg-slate-800 [&_[data-slot=progress-indicator]]:bg-teal-300" />
-              <p className="mt-3 text-xs leading-5 text-slate-500">A nota e o veredito permanecem bloqueados até as duas passagens terminarem.</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">Notas permanecem bloqueadas até todos os critérios, dados e fontes passarem pela dupla revisão.</p>
             </div>
           </div>
         </section>
 
-        <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          {[
-            ["Qualidade", showScore(instrument.quality_score)],
-            ["Renda", showScore(instrument.income_score)],
-            ["Segurança", showScore(instrument.safety_score)],
-            ["Oportunidade", showScore(instrument.opportunity_score)],
-            ["Confiança", showScore(instrument.confidence_score)],
-          ].map(([label, value]) => (
-            <Card key={label} className="gap-2 border-white/8 bg-[#0b1826] py-5 shadow-none">
+        <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-7">
+          {dimensionScores.map(([dimension, scoreValue]) => (
+            <Card key={dimension.code} className="gap-2 border-white/8 bg-[#0b1826] py-5 shadow-none">
               <CardContent className="px-5">
-                <p className="text-xs text-slate-500">{label}</p>
-                <p className="mt-1 font-mono text-2xl text-white">{value}</p>
-                <p className="mt-1 text-[11px] text-slate-600">não avaliado ≠ zero</p>
+                <p className="text-xs text-slate-500">{dimension.label}</p>
+                <p className="mt-1 font-mono text-2xl text-white">{showScore(scoreValue)}</p>
+                <p className="mt-1 text-[11px] text-slate-600">peso {Math.round(dimension.weight * 100)}%</p>
               </CardContent>
             </Card>
           ))}
+          <Card className="gap-2 border-teal-300/15 bg-teal-300/[0.045] py-5 shadow-none">
+            <CardContent className="px-5">
+              <p className="text-xs text-teal-200/70">Nota ponderada</p>
+              <p className="mt-1 font-mono text-2xl text-white">{showScore(instrument.weighted_score)}</p>
+              <p className="mt-1 text-[11px] text-slate-600">não avaliado ≠ zero</p>
+            </CardContent>
+          </Card>
         </section>
 
         <section className="mb-6 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
@@ -109,7 +124,13 @@ export default async function FundPage({ params }: FundPageProps) {
             </CardHeader>
             <CardContent>
               {instrument.verdict_summary ? (
-                <p className="text-sm leading-7 text-slate-200">{instrument.verdict_summary}</p>
+                <div className="space-y-4">
+                  <p className="text-sm leading-7 text-slate-200">{instrument.verdict_summary}</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/7 bg-white/[0.02] p-4"><p className="text-xs text-slate-500">Dinheiro novo</p><p className="mt-1 text-sm font-medium text-white">{instrument.action_new_money ?? "—"}</p></div>
+                    <div className="rounded-xl border border-white/7 bg-white/[0.02] p-4"><p className="text-xs text-slate-500">Cotista atual</p><p className="mt-1 text-sm font-medium text-white">{instrument.action_existing_holder ?? "—"}</p></div>
+                  </div>
+                </div>
               ) : (
                 <div className="flex gap-3 rounded-xl border border-amber-300/12 bg-amber-300/[0.045] p-4 text-sm leading-6 text-amber-100/90">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />
@@ -132,9 +153,17 @@ export default async function FundPage({ params }: FundPageProps) {
                 <div className="mb-2 flex justify-between text-xs text-slate-400"><span>Segunda passagem</span><span>{secondComplete}/{sections.length}</span></div>
                 <Progress value={sections.length ? (secondComplete / sections.length) * 100 : 0} className="h-1.5 bg-slate-800 [&_[data-slot=progress-indicator]]:bg-violet-300" />
               </div>
+              <div>
+                <div className="mb-2 flex justify-between text-xs text-slate-400"><span>Critérios — 1ª / 2ª</span><span>{firstCriteria}/{criterionTotal} · {secondCriteria}/{criterionTotal}</span></div>
+                <Progress value={criterionTotal ? (secondCriteria / criterionTotal) * 100 : 0} className="h-1.5 bg-slate-800 [&_[data-slot=progress-indicator]]:bg-teal-300" />
+              </div>
               <div className="flex items-center justify-between rounded-lg border border-white/7 bg-white/[0.02] px-3 py-2 text-xs">
-                <span className="text-slate-400">Páginas conferidas</span>
-                <span className="font-mono text-white">{pagesReviewed}/{pagesTotal || "—"}</span>
+                <span className="text-slate-400">Páginas — 1ª / 2ª</span>
+                <span className="font-mono text-white">{firstPages}/{pagesTotal || "—"} · {secondPages}/{pagesTotal || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-white/7 bg-white/[0.02] px-3 py-2 text-xs">
+                <span className="text-slate-400">Prontidão do banco</span>
+                <span className="font-medium text-white">{readiness?.completion_ready ? "completa" : readiness?.research_exhausted ? "dados insuficientes" : "bloqueada"}</span>
               </div>
             </CardContent>
           </Card>
@@ -144,7 +173,7 @@ export default async function FundPage({ params }: FundPageProps) {
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-teal-300/70">Escopo completo</p>
-              <h2 className="mt-1 text-xl font-semibold text-white">16 blocos da análise</h2>
+              <h2 className="mt-1 text-xl font-semibold text-white">16 blocos e {criterionTotal} critérios da análise</h2>
             </div>
             <span className="hidden text-xs text-slate-500 sm:block">Cada bloco exige duas verificações independentes</span>
           </div>
@@ -187,7 +216,7 @@ export default async function FundPage({ params }: FundPageProps) {
                   {documents.map((document) => (
                     <div key={document.id} className="flex items-center justify-between gap-4 rounded-lg border border-white/7 bg-white/[0.02] p-3 text-sm">
                       <div><p className="text-white">{document.title}</p><p className="mt-1 text-xs text-slate-500">{document.competence_date ?? "sem competência"}</p></div>
-                      <span className="font-mono text-xs text-slate-400">{document.pages_reviewed}/{document.pages_total ?? "—"}</span>
+                      <span className="font-mono text-xs text-slate-400">{document.first_pass_pages_reviewed ?? 0}/{document.pages_total ?? "—"} · {document.second_pass_pages_reviewed ?? 0}/{document.pages_total ?? "—"}</span>
                     </div>
                   ))}
                 </div>
@@ -230,4 +259,3 @@ export default async function FundPage({ params }: FundPageProps) {
     </div>
   );
 }
-

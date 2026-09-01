@@ -5,6 +5,17 @@ export type DeepMaxSectionDefinition = {
   criteria: readonly string[];
 };
 
+export const deepMaxMethodologyVersion = "deep-max-v2";
+
+export const deepMaxScoreWeights = [
+  { code: "income", label: "Renda sustentável", weight: 0.25 },
+  { code: "quality", label: "Qualidade dos ativos", weight: 0.2 },
+  { code: "balance", label: "Balanço e caixa", weight: 0.2 },
+  { code: "management", label: "Gestão e governança", weight: 0.15 },
+  { code: "value", label: "Valor e margem de segurança", weight: 0.15 },
+  { code: "technical", label: "Técnico e liquidez", weight: 0.05 },
+] as const;
+
 export const deepMaxSections: readonly DeepMaxSectionDefinition[] = [
   {
     code: "identity",
@@ -202,12 +213,85 @@ export const deepMaxSections: readonly DeepMaxSectionDefinition[] = [
 
 export const deepMaxDocumentMinimums = {
   managementReports: 6,
-  financialStatements: 1,
-  auditReports: 1,
+  uniqueManagementCompetencies: 6,
+  financialStatements: 3,
+  auditedFinancialYears: 3,
   regulations: 1,
   distributions: 36,
-  pricePoints: 500,
-  distinctMetrics: 8,
+  classifiedDistributions: 36,
+  pricePoints: 750,
+  priceHistoryYears: 3,
+  universalMetrics: 32,
+  valuationScenarios: 3,
+  valuationAssumptions: 12,
+  risks: 5,
+  thesisTriggers: 3,
+} as const;
+
+export const deepMaxDocumentScopes = [
+  "Relatórios gerenciais",
+  "Demonstrações financeiras, notas e auditoria",
+  "Regulamento vigente e versões materiais",
+  "Fatos relevantes e comunicados",
+  "Assembleias e deliberações",
+  "Emissões e recompras",
+  "Aquisições, vendas e desenvolvimentos",
+  "Laudos e avaliações",
+  "Contingências, seguros e documentos legais aplicáveis",
+] as const;
+
+export const deepMaxStructuredScopes = [
+  "Imóveis e exposições",
+  "Locatários",
+  "Contratos",
+  "Dívidas e compromissos",
+  "Valuation e premissas",
+  "Riscos e estresses",
+  "Gatilhos e falsificadores",
+  "Indicadores técnicos e de liquidez",
+] as const;
+
+export const deepMaxSegmentOverlays = {
+  logistics: {
+    label: "Logística e industrial",
+    criteria: [
+      "Custo de reposição, valor do terreno e aluguel por metro quadrado",
+      "Oferta, absorção, vacância e aluguel no micromercado",
+      "Acessos, raio logístico, last mile e dependência de infraestrutura",
+      "Pé-direito, piso, docas, certificações, idade e fungibilidade",
+      "Aderência do imóvel ao locatário e custo de recolocação",
+    ],
+  },
+  shopping: {
+    label: "Shopping centers",
+    criteria: [
+      "Vendas por metro quadrado, SSS, SSR e fluxo de consumidores",
+      "NOI por metro quadrado e margem operacional",
+      "Custo de ocupação, inadimplência, descontos e carências",
+      "Mix de lojas, âncoras, concentração e poder de atração",
+      "Área de influência, competição, expansões e capex",
+    ],
+  },
+  offices: {
+    label: "Lajes corporativas",
+    criteria: [
+      "Aluguel pedido, efetivo e de mercado por metro quadrado",
+      "Vacância, absorção e oferta futura no submercado",
+      "Classe, idade, retrofit, certificações e obsolescência",
+      "Incentivos de locação, carências, comissão e capex de recolocação",
+      "Acessibilidade, transporte, serviços e demanda corporativa",
+    ],
+  },
+  urban_income: {
+    label: "Renda urbana e varejo",
+    criteria: [
+      "Fungibilidade, uso alternativo e liquidez imobiliária",
+      "Crédito e concentração dos locatários dominantes",
+      "Força econômica dos contratos atípicos e multas",
+      "BTS, earn-outs, obras, parcelas e capex comprometido",
+      "Aluguel contratado versus mercado e custo de substituição",
+    ],
+  },
 } as const;
 
 export function getDeepMaxSection(code: string) {

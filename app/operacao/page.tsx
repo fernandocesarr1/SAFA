@@ -114,6 +114,13 @@ export default async function OperationPage({ searchParams }: OperationPageProps
   const secondSections = readiness
     ? value(readiness.second_sections_complete)
     : sections.filter((section) => section.second_pass_status === "complete").length;
+  const criterionTotal = readiness ? value(readiness.criterion_total) : deepMaxSections.length * 5;
+  const firstCriteria = readiness ? value(readiness.first_criteria_complete) : 0;
+  const secondCriteria = readiness ? value(readiness.second_criteria_complete) : 0;
+  const documentScopeTotal = readiness ? value(readiness.document_scope_total) : 9;
+  const documentScopes = readiness ? value(readiness.document_scopes_complete) : 0;
+  const dataScopeTotal = readiness ? value(readiness.data_scope_total) : 8;
+  const dataScopes = readiness ? value(readiness.data_scopes_complete) : 0;
   const documentsTotal = readiness ? value(readiness.documents_total) : documents.length;
   const firstDocuments = readiness
     ? value(readiness.first_documents_complete)
@@ -124,76 +131,122 @@ export default async function OperationPage({ searchParams }: OperationPageProps
   const managementReports = readiness
     ? value(readiness.management_reports)
     : documents.filter((document) => document.document_type === "management_report").length;
-  const financialStatements = readiness
-    ? value(readiness.financial_statements)
-    : documents.filter((document) => document.document_type === "financial_statement").length;
-  const auditReports = readiness
-    ? value(readiness.audit_reports)
-    : documents.filter((document) => document.document_type === "audit_report").length;
+  const managementCompetencies = readiness ? value(readiness.management_unique_competencies) : 0;
+  const auditedYears = readiness ? value(readiness.audited_financial_years) : 0;
   const regulations = readiness
     ? value(readiness.regulations)
     : documents.filter((document) => document.document_type === "regulation").length;
   const distributions = readiness ? value(readiness.distribution_count) : 0;
+  const classifiedDistributions = readiness ? value(readiness.classified_distribution_count) : 0;
+  const distributionSpan = readiness ? value(readiness.distribution_span_days) : 0;
   const prices = readiness ? value(readiness.price_count) : 0;
-  const metrics = readiness ? value(readiness.distinct_metric_count) : 0;
+  const priceSpan = readiness ? value(readiness.price_span_days) : 0;
+  const requiredMetrics = readiness ? value(readiness.required_metric_count) : deepMaxDocumentMinimums.universalMetrics;
+  const verifiedMetrics = readiness ? value(readiness.verified_required_metric_count) : 0;
+  const propertyCount = readiness ? value(readiness.property_count) : 0;
+  const tenantCount = readiness ? value(readiness.tenant_count) : 0;
+  const leaseCount = readiness ? value(readiness.lease_count) : 0;
+  const debtCount = readiness ? value(readiness.debt_count) : 0;
+  const scenarioCount = readiness ? value(readiness.valuation_scenario_count) : 0;
+  const assumptionCount = readiness ? value(readiness.valuation_assumption_count) : 0;
+  const counterModelCount = readiness ? value(readiness.counter_model_count) : 0;
+  const riskCount = readiness ? value(readiness.risk_count) : 0;
+  const triggerTypeCount = readiness ? value(readiness.thesis_trigger_type_count) : 0;
   const pagesTotal = readiness ? value(readiness.pages_total) : documents.reduce((sum, document) => sum + (document.pages_total ?? 0), 0);
   const firstPages = readiness ? value(readiness.first_pages_reviewed) : documents.reduce((sum, document) => sum + (document.first_pass_pages_reviewed ?? 0), 0);
   const secondPages = readiness ? value(readiness.second_pages_reviewed) : documents.reduce((sum, document) => sum + (document.second_pass_pages_reviewed ?? 0), 0);
 
+  const eligibilityComplete = Boolean(readiness?.eligibility_ready);
+  const scopesComplete =
+    documentScopeTotal === 9 && documentScopes === documentScopeTotal &&
+    dataScopeTotal === 8 && dataScopes === dataScopeTotal;
   const documentsCatalogued =
-    managementReports >= deepMaxDocumentMinimums.managementReports &&
-    financialStatements >= deepMaxDocumentMinimums.financialStatements &&
-    auditReports >= deepMaxDocumentMinimums.auditReports &&
+    managementCompetencies >= deepMaxDocumentMinimums.uniqueManagementCompetencies &&
+    auditedYears >= deepMaxDocumentMinimums.auditedFinancialYears &&
     regulations >= deepMaxDocumentMinimums.regulations;
   const documentPassesComplete =
     documentsTotal > 0 &&
     firstDocuments === documentsTotal &&
     secondDocuments === documentsTotal &&
     (pagesTotal === 0 || (firstPages >= pagesTotal && secondPages >= pagesTotal));
-  const historyComplete = distributions >= deepMaxDocumentMinimums.distributions;
-  const pricesComplete = prices >= deepMaxDocumentMinimums.pricePoints;
-  const metricsComplete = metrics >= deepMaxDocumentMinimums.distinctMetrics;
+  const historyComplete =
+    distributions >= deepMaxDocumentMinimums.distributions &&
+    classifiedDistributions >= deepMaxDocumentMinimums.classifiedDistributions &&
+    distributionSpan >= 1035;
+  const pricesComplete = prices >= deepMaxDocumentMinimums.pricePoints && priceSpan >= 1090;
+  const metricsComplete = requiredMetrics >= deepMaxDocumentMinimums.universalMetrics && verifiedMetrics === requiredMetrics;
   const firstPassComplete = sectionTotal === deepMaxSections.length && firstSections === sectionTotal;
   const secondPassComplete = sectionTotal === deepMaxSections.length && secondSections === sectionTotal;
+  const criteriaComplete = criterionTotal >= 80 && firstCriteria === criterionTotal && secondCriteria === criterionTotal;
+  const structuredComplete =
+    propertyCount > 0 && tenantCount > 0 && leaseCount > 0 &&
+    (debtCount > 0 || Boolean(readiness?.debt_scope_not_applicable)) &&
+    scenarioCount === deepMaxDocumentMinimums.valuationScenarios &&
+    assumptionCount >= deepMaxDocumentMinimums.valuationAssumptions &&
+    counterModelCount >= 1 && riskCount >= deepMaxDocumentMinimums.risks &&
+    triggerTypeCount >= deepMaxDocumentMinimums.thesisTriggers;
   const finalFieldsComplete =
     selected.verdict !== null &&
     selected.quality_score !== null &&
     selected.income_score !== null &&
-    selected.safety_score !== null &&
-    selected.opportunity_score !== null &&
+    selected.balance_cash_score !== null &&
+    selected.management_governance_score !== null &&
+    selected.value_margin_score !== null &&
+    selected.technical_liquidity_score !== null &&
+    selected.weighted_score !== null &&
     selected.risk_score !== null &&
-    selected.confidence_score !== null;
+    selected.confidence_score !== null &&
+    selected.action_new_money !== null &&
+    selected.action_existing_holder !== null;
 
   const gates = [
     {
-      label: "Escopo documental cadastrado",
-      detail: `${managementReports}/6 relatórios gerenciais · ${financialStatements}/1 demonstração · ${auditReports}/1 auditoria · ${regulations}/1 regulamento`,
-      complete: documentsCatalogued,
+      label: "Acesso do investidor comum verificado",
+      detail: eligibilityComplete ? "Mercado, regulador, público-alvo e recência confirmados." : "Faltam duas fontes e verificação recente de elegibilidade.",
+      complete: eligibilityComplete,
+      icon: CheckCircle2,
+    },
+    {
+      label: "Catálogos de escopo esgotados",
+      detail: `${documentScopes}/${documentScopeTotal} escopos documentais · ${dataScopes}/${dataScopeTotal} escopos estruturados`,
+      complete: scopesComplete,
       icon: FileText,
+    },
+    {
+      label: "Histórico documental mínimo",
+      detail: `${managementCompetencies}/6 competências gerenciais · ${auditedYears}/3 exercícios auditados · ${regulations}/1 regulamento · ${managementReports} relatórios catalogados`,
+      complete: documentsCatalogued,
+      icon: BookOpenCheck,
     },
     {
       label: "Documentos lidos duas vezes",
       detail: `${firstDocuments}/${documentsTotal} na primeira leitura · ${secondDocuments}/${documentsTotal} na releitura · ${firstPages}/${pagesTotal || "—"} e ${secondPages}/${pagesTotal || "—"} páginas`,
       complete: documentPassesComplete,
-      icon: BookOpenCheck,
+      icon: FileText,
     },
     {
       label: "Históricos quantitativos suficientes",
-      detail: `${distributions}/36 distribuições · ${prices}/500 preços · ${metrics}/8 métricas essenciais`,
+      detail: `${classifiedDistributions}/36 distribuições classificadas · ${prices}/750 pregões · ${verifiedMetrics}/${requiredMetrics} métricas verificadas`,
       complete: historyComplete && pricesComplete && metricsComplete,
       icon: History,
     },
     {
       label: "Primeira passagem integral",
-      detail: `${firstSections}/${sectionTotal || deepMaxSections.length} áreas concluídas`,
-      complete: firstPassComplete,
+      detail: `${firstSections}/${sectionTotal || deepMaxSections.length} áreas · ${firstCriteria}/${criterionTotal} critérios`,
+      complete: firstPassComplete && firstCriteria === criterionTotal,
       icon: Database,
     },
     {
       label: "Segunda passagem crítica",
-      detail: `${secondSections}/${sectionTotal || deepMaxSections.length} áreas reavaliadas`,
-      complete: secondPassComplete,
+      detail: `${secondSections}/${sectionTotal || deepMaxSections.length} áreas · ${secondCriteria}/${criterionTotal} critérios`,
+      complete: secondPassComplete && criteriaComplete,
       icon: Gauge,
+    },
+    {
+      label: "Dados normalizados e contramodelo",
+      detail: `${propertyCount} imóveis · ${tenantCount} locatários · ${leaseCount} contratos · ${scenarioCount}/3 cenários · ${assumptionCount}/12 premissas · ${riskCount}/5 riscos`,
+      complete: structuredComplete,
+      icon: Database,
     },
     {
       label: "Veredito e notas liberados",
@@ -258,7 +311,11 @@ export default async function OperationPage({ searchParams }: OperationPageProps
               </form>
               <div className="flex gap-3 rounded-xl border border-amber-300/12 bg-amber-300/[0.045] p-4 text-xs leading-5 text-amber-100/90">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />
-                Ausência de dado não vira zero nem média presumida. Ela mantém o bloqueio aberto.
+                {readiness?.research_exhausted && !readiness.completion_ready
+                  ? "A pesquisa foi esgotada, mas há evidência crítica indisponível: só é permitida a conclusão sem notas como dados insuficientes."
+                  : readiness?.completion_ready
+                    ? "Todos os bloqueios estão satisfeitos; notas e veredito podem ser registrados para esta data-base."
+                    : "Ausência de dado não vira zero nem média presumida. O bloqueio permanece aberto até a pesquisa ser esgotada."}
               </div>
             </CardContent>
           </Card>

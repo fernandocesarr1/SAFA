@@ -45,9 +45,10 @@ test("renders the SAFA dashboard and core routes", async () => {
 
   const cases = [
     ["/", /Fila Deep Max/i],
-    ["/fundos/HGLG11", /16 blocos da análise/i],
+    ["/fundos/HGLG11", /16 blocos e/i],
     ["/operacao?ticker=HGLG11", /Matriz de esgotamento/i],
     ["/comparador?a=HGLG11&b=BTLG11", /Coloque as teses lado a lado/i],
+    ["/metodologia", /O que precisa existir antes de uma nota/i],
   ];
 
   for (const [pathname, expected] of cases) {

@@ -23,6 +23,10 @@ function show(value: number | string | null, suffix = "") {
   return parsed === null ? "—" : `${parsed.toFixed(1)}${suffix}`;
 }
 
+function showText(value: string | null) {
+  return value ?? "—";
+}
+
 function ComparisonRow({
   label,
   left,
@@ -121,14 +125,19 @@ export default async function Comparator({ searchParams }: ComparatorProps) {
             ))}
           </div>
 
-          <ComparisonRow label="Qualidade" left={show(left.quality_score)} right={show(right.quality_score)} detail="Qualidade econômica sem considerar a cotação" />
-          <ComparisonRow label="Renda sustentável" left={show(left.income_score)} right={show(right.income_score)} detail="Recorrência, cobertura e previsibilidade" />
-          <ComparisonRow label="Segurança" left={show(left.safety_score)} right={show(right.safety_score)} detail="Resiliência operacional, financeira e contratual" />
-          <ComparisonRow label="Oportunidade" left={show(left.opportunity_score)} right={show(right.opportunity_score)} detail="Qualidade combinada ao preço e à margem de segurança" />
+          <ComparisonRow label="Renda sustentável · 25%" left={show(left.income_score)} right={show(right.income_score)} detail="Recorrência, cobertura e previsibilidade" />
+          <ComparisonRow label="Qualidade dos ativos · 20%" left={show(left.quality_score)} right={show(right.quality_score)} detail="Imóveis, localização, concentração e obsolescência" />
+          <ComparisonRow label="Balanço e caixa · 20%" left={show(left.balance_cash_score)} right={show(right.balance_cash_score)} detail="Dívida, liquidez, compromissos e resiliência" />
+          <ComparisonRow label="Gestão e governança · 15%" left={show(left.management_governance_score)} right={show(right.management_governance_score)} detail="Alocação de capital, conflitos e execução" />
+          <ComparisonRow label="Valor e margem · 15%" left={show(left.value_margin_score)} right={show(right.value_margin_score)} detail="Três cenários, contramodelo e preço de entrada" />
+          <ComparisonRow label="Técnico e liquidez · 5%" left={show(left.technical_liquidity_score)} right={show(right.technical_liquidity_score)} detail="Histórico, volume, tendência e pontos técnicos" />
+          <ComparisonRow label="Nota ponderada" left={show(left.weighted_score)} right={show(right.weighted_score)} detail="Calculada pelo banco; não pode ser digitada manualmente" />
           <ComparisonRow label="Risco" left={show(left.risk_score)} right={show(right.risk_score)} detail="Exibido separadamente; menor não é automaticamente melhor" />
           <ComparisonRow label="Confiança da análise" left={show(left.confidence_score)} right={show(right.confidence_score)} detail="Cobertura e consistência dos dados disponíveis" />
           <ComparisonRow label="Preço atual" left={show(left.current_price, "")} right={show(right.current_price, "")} />
           <ComparisonRow label="Valor justo base" left={show(left.fair_value_base, "")} right={show(right.fair_value_base, "")} />
+          <ComparisonRow label="Ação para dinheiro novo" left={showText(left.action_new_money)} right={showText(right.action_new_money)} />
+          <ComparisonRow label="Ação para cotista atual" left={showText(left.action_existing_holder)} right={showText(right.action_existing_holder)} />
 
           <div className="grid gap-0 border-t border-white/6 md:grid-cols-2">
             <div className="border-b border-white/6 p-6 md:border-b-0 md:border-r"><p className="mb-2 text-xs font-medium text-teal-300/70">Veredito de {left.ticker}</p><Verdict item={left} /></div>
@@ -144,4 +153,3 @@ export default async function Comparator({ searchParams }: ComparatorProps) {
     </div>
   );
 }
-

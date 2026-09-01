@@ -5,8 +5,14 @@ export type QueueItem = {
   name: string | null;
   sector: string | null;
   segment: string | null;
+  segment_key: string | null;
   queue_position: number | null;
   eligible_retail: boolean;
+  eligibility_status: string;
+  eligibility_confidence: string;
+  eligibility_source_url: string | null;
+  eligibility_verified_at: string | null;
+  universe_status: string;
   analysis_run_id: number | null;
   version: number | null;
   methodology_version: string | null;
@@ -18,14 +24,22 @@ export type QueueItem = {
   opportunity_score: number | string | null;
   income_score: number | string | null;
   safety_score: number | string | null;
+  balance_cash_score: number | string | null;
+  management_governance_score: number | string | null;
+  value_margin_score: number | string | null;
+  technical_liquidity_score: number | string | null;
+  weighted_score: number | string | null;
   risk_score: number | string | null;
   confidence_score: number | string | null;
+  action_new_money: string | null;
+  action_existing_holder: string | null;
   current_price: number | string | null;
   fair_value_low: number | string | null;
   fair_value_base: number | string | null;
   fair_value_high: number | string | null;
   sustainable_income_per_share: number | string | null;
   as_of_date: string | null;
+  is_stale: boolean;
   updated_at: string | null;
 };
 
@@ -67,9 +81,21 @@ export type AnalysisReadiness = {
   section_total: number;
   first_sections_complete: number;
   second_sections_complete: number;
+  criterion_total: number;
+  first_criteria_complete: number;
+  second_criteria_complete: number;
+  critical_unavailable_count: number;
+  document_scope_total: number;
+  document_scopes_complete: number;
+  data_scope_total: number;
+  data_scopes_complete: number;
+  debt_scope_not_applicable: boolean;
   documents_total: number;
   management_reports: number;
+  management_unique_competencies: number;
   financial_statements: number;
+  financial_statement_years: number;
+  audited_financial_years: number;
   audit_reports: number;
   regulations: number;
   first_documents_complete: number;
@@ -78,13 +104,38 @@ export type AnalysisReadiness = {
   first_pages_reviewed: number;
   second_pages_reviewed: number;
   distribution_count: number;
+  classified_distribution_count: number;
+  distribution_span_days: number;
   price_count: number;
+  price_span_days: number;
   distinct_metric_count: number;
+  required_metric_count: number;
+  verified_required_metric_count: number;
+  property_count: number;
+  tenant_count: number;
+  lease_count: number;
+  debt_count: number;
+  valuation_scenario_count: number;
+  valuation_assumption_count: number;
+  counter_model_count: number;
+  risk_count: number;
+  thesis_trigger_type_count: number;
+  eligibility_ready: boolean;
+  data_fresh: boolean;
+  research_exhausted: boolean;
   completion_ready: boolean;
+};
+
+export type UniverseStats = {
+  fii_registered: number;
+  fii_retail_verified: number;
+  fii_queued: number;
+  fii_completed: number;
 };
 
 export type RankingEntry = {
   snapshot_id: number;
+  analysis_run_id: number;
   cutoff_date: string;
   universe_size: number;
   rank_overall: number;
@@ -96,6 +147,11 @@ export type RankingEntry = {
   opportunity_score: number | string;
   income_score: number | string;
   safety_score: number | string;
+  balance_cash_score: number | string;
+  management_governance_score: number | string;
+  value_margin_score: number | string;
+  technical_liquidity_score: number | string;
+  risk_score: number | string;
   confidence_score: number | string;
   verdict: string;
   rationale: string;
@@ -121,11 +177,17 @@ const fallbackQueue: QueueItem[] = initialTickers.map((ticker, index) => ({
   name: null,
   sector: null,
   segment: null,
+  segment_key: null,
   queue_position: index + 1,
   eligible_retail: true,
+  eligibility_status: "unverified",
+  eligibility_confidence: "low",
+  eligibility_source_url: null,
+  eligibility_verified_at: null,
+  universe_status: "queued",
   analysis_run_id: index + 1,
   version: 1,
-  methodology_version: "deep-max-v1",
+  methodology_version: "deep-max-v2",
   status: "backlog",
   coverage_pct: 0,
   verdict: null,
@@ -134,14 +196,22 @@ const fallbackQueue: QueueItem[] = initialTickers.map((ticker, index) => ({
   opportunity_score: null,
   income_score: null,
   safety_score: null,
+  balance_cash_score: null,
+  management_governance_score: null,
+  value_margin_score: null,
+  technical_liquidity_score: null,
+  weighted_score: null,
   risk_score: null,
   confidence_score: null,
+  action_new_money: null,
+  action_existing_holder: null,
   current_price: null,
   fair_value_low: null,
   fair_value_base: null,
   fair_value_high: null,
   sustainable_income_per_share: null,
   as_of_date: null,
+  is_stale: true,
   updated_at: null,
 }));
 
@@ -265,6 +335,20 @@ export async function getCurrentRanking(): Promise<RankingEntry[]> {
     );
   } catch {
     return [];
+  }
+}
+
+export async function getUniverseStats(): Promise<UniverseStats> {
+  try {
+    const rows = await select<UniverseStats>("v_universe_stats?select=*&limit=1");
+    return rows[0] ?? { fii_registered: 0, fii_retail_verified: 0, fii_queued: 0, fii_completed: 0 };
+  } catch {
+    return {
+      fii_registered: fallbackQueue.length,
+      fii_retail_verified: 0,
+      fii_queued: fallbackQueue.length,
+      fii_completed: 0,
+    };
   }
 }
 

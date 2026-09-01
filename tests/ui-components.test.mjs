@@ -84,31 +84,63 @@ test("renders sidebar skeletons deterministically", async () => {
   assert.match(first, /--skeleton-width:70%/);
 });
 
-test("keeps the Deep Max methodology exhaustive and non-duplicated", async () => {
-  const { deepMaxSections, deepMaxDocumentMinimums } = await vite.ssrLoadModule(
+test("keeps the Deep Max v2 methodology exhaustive, weighted and non-duplicated", async () => {
+  const { deepMaxSections, deepMaxDocumentMinimums, deepMaxScoreWeights, deepMaxSegmentOverlays } = await vite.ssrLoadModule(
     "/lib/deep-max-methodology.ts",
   );
   const codes = deepMaxSections.map((section) => section.code);
 
   assert.equal(deepMaxSections.length, 16);
   assert.equal(new Set(codes).size, 16);
-  assert.ok(deepMaxSections.every((section) => section.criteria.length >= 5));
+  assert.equal(deepMaxSections.reduce((total, section) => total + section.criteria.length, 0), 80);
+  assert.ok(Object.values(deepMaxSegmentOverlays).every((overlay) => overlay.criteria.length === 5));
+  assert.equal(deepMaxScoreWeights.reduce((total, dimension) => total + dimension.weight, 0), 1);
+  assert.deepEqual(deepMaxScoreWeights.map(({ code, weight }) => [code, weight]), [
+    ["income", 0.25],
+    ["quality", 0.2],
+    ["balance", 0.2],
+    ["management", 0.15],
+    ["value", 0.15],
+    ["technical", 0.05],
+  ]);
   assert.deepEqual(deepMaxDocumentMinimums, {
     managementReports: 6,
-    financialStatements: 1,
-    auditReports: 1,
+    uniqueManagementCompetencies: 6,
+    financialStatements: 3,
+    auditedFinancialYears: 3,
     regulations: 1,
     distributions: 36,
-    pricePoints: 500,
-    distinctMetrics: 8,
+    classifiedDistributions: 36,
+    pricePoints: 750,
+    priceHistoryYears: 3,
+    universalMetrics: 32,
+    valuationScenarios: 3,
+    valuationAssumptions: 12,
+    risks: 5,
+    thesisTriggers: 3,
   });
 });
 
 test("keeps database-level completion guards in the canonical schema", async () => {
-  const schema = await readFile(path.join(root, "supabase/schema.sql"), "utf8");
+  const base = await readFile(path.join(root, "supabase/schema.sql"), "utf8");
+  const patch = await readFile(path.join(root, "supabase/deep_max_v2.sql"), "utf8");
+  const schema = `${base}\n${patch}`;
 
-  assert.match(schema, /create or replace view public\.v_analysis_readiness/i);
+  assert.match(schema, /create view public\.v_analysis_readiness/i);
   assert.match(schema, /validate_analysis_run_completion/i);
   assert.match(schema, /first_pass_pages_reviewed/i);
   assert.match(schema, /second_pass_omissions/i);
+  assert.match(schema, /analysis_criterion_reviews/i);
+  assert.match(schema, /fund_properties/i);
+  assert.match(schema, /fund_tenants/i);
+  assert.match(schema, /fund_leases/i);
+  assert.match(schema, /debt_obligations/i);
+  assert.match(schema, /valuation_scenarios/i);
+  assert.match(schema, /risk_register/i);
+  assert.match(schema, /thesis_triggers/i);
+  assert.match(schema, /price_count >= 750/i);
+  assert.match(schema, /classified_distribution_count >= 36/i);
+  assert.match(schema, /new\.income_score \* 0\.25/i);
+  assert.match(schema, /analysis_runs_one_active_idx/i);
+  assert.match(schema, /somente analise Deep Max integralmente concluida entra no ranking/i);
 });
