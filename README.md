@@ -4,6 +4,12 @@ Sistema pessoal de Análise de FIIs e Ações. A primeira fase cobre FIIs acess�
 
 ## Estado atual
 
+> **Uso para aportes suspenso.** As séries de preços atuais não têm coleta
+> reproduzível nem fonte específica verificável. TRXF11 e GGRC11 dependem dessas
+> séries para parte das métricas e dos vereditos; por isso, o ranking atual não
+> deve orientar alocação até a recoleta e o recálculo. Consulte
+> [`DEBITOS_TECNICOS.md`](DEBITOS_TECNICOS.md), itens D1–D3.
+
 - painel de cobertura do universo e fila de análises;
 - Central de Análise com matriz de esgotamento e critérios explícitos por área;
 - ficha individual com 16 blocos, 80 critérios universais e 5 critérios por segmento;
@@ -32,17 +38,30 @@ A nota ponderada é calculada pelo banco. Entradas do ranking são derivadas exc
 
 ## Arquitetura
 
-- fonte oficial: GitHub, branch `main`;
+- código e migrations aprovados: GitHub, branch `main`;
 - interface: Next.js/Vinext, preparada para execução em Cloudflare Workers;
 - dados: Supabase/Postgres com RLS e acesso público somente para leitura;
 - hospedagem atual: ChatGPT Sites, alimentado por um espelho do código aprovado no GitHub;
-- esquema reproduzível: migrations SQL versionadas em `supabase/`;
+- destino do livro-razão: migrations SQL imutáveis em `supabase/migrations/`;
 - escrita: restrita ao administrador e aos processos de análise.
+
+O schema ainda **não é reproduzível a partir do repositório**: cinco das seis
+migrations vivas não possuem correspondência exata e há SQL aplicado fora do
+livro-razão. A reconciliação é a próxima etapa técnica, sem mudança de
+comportamento ou de dados.
 
 Os PDFs e imagens de relatórios não são guardados. O banco mantém somente referências, competência, contagem de páginas, números estruturados e conclusões necessárias para decisão.
 
-O repositório não contém resultados fabricados nem reaproveita vereditos antigos sem evidência. O estado operacional das análises fica no Supabase e não deve ser substituído por dados fictícios no código.
+O estado operacional das análises fica no Supabase. Dados sem linhagem até uma
+fonte primária específica não podem alimentar gates, cálculos, vereditos ou
+ranking.
 
 ## Colaboração
 
-Claude, Codex e colaboradores humanos trabalham em branches próprias e integram mudanças por pull request. Consulte [CONTRIBUTING.md](CONTRIBUTING.md). Instruções específicas para Claude estão em [CLAUDE.md](CLAUDE.md).
+Todo assistente deve ler [`AGENTS.md`](AGENTS.md) antes da primeira ação da
+sessão. Dívidas conhecidas ficam em
+[`DEBITOS_TECNICOS.md`](DEBITOS_TECNICOS.md), e cada sessão gera um registro
+imutável em `docs/sessions/`. Claude, Codex e colaboradores humanos trabalham em
+branches próprias e integram mudanças por pull request. Consulte
+[`CONTRIBUTING.md`](CONTRIBUTING.md); instruções específicas para Claude estão em
+[`CLAUDE.md`](CLAUDE.md).
