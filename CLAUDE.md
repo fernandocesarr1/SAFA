@@ -1,6 +1,11 @@
 # Instruções para Claude no SAFA
 
-Antes de alterar o projeto, leia `README.md`, `CONTRIBUTING.md`, `lib/deep-max-methodology.ts` e as migrations relacionadas ao módulo afetado.
+Antes de qualquer ação da sessão, leia `AGENTS.md` integralmente. Em seguida,
+cumpra o protocolo de abertura de `AGENTS.md` §5 e leia `README.md`,
+`CONTRIBUTING.md`, `DEBITOS_TECNICOS.md`, o registro de sessão mais recente e os
+arquivos relacionados ao módulo afetado.
+
+`AGENTS.md` é normativo e prevalece sobre este arquivo.
 
 ## Fonte e entrega
 
@@ -13,8 +18,12 @@ Antes de alterar o projeto, leia `README.md`, `CONTRIBUTING.md`, `lib/deep-max-m
 
 - O backend é Supabase/Postgres.
 - Consulte o esquema e as migrations antes de propor SQL.
-- Para evolução do banco, crie migration nova, aditiva, idempotente e com comentários sobre rollback ou compatibilidade.
-- Não execute DDL ou DML no projeto de produção sem autorização explícita.
+- O Claude no chat não aplica migrations: pode redigir e revisar SQL, mas entrega
+  a aplicação a um agente que consiga escrever no banco e versionar no GitHub na
+  mesma sessão.
+- Para evolução do banco, siga o fluxo completo de `AGENTS.md` §§4 e 7–10.
+- Não execute DDL ou DML no projeto de produção sem autorização explícita e
+  nominal de Fernando.
 - Nunca solicite, imprima ou versione service-role keys.
 
 ## Regras do produto
@@ -29,7 +38,8 @@ Antes de alterar o projeto, leia `README.md`, `CONTRIBUTING.md`, `lib/deep-max-m
 
 ## Antes do pull request
 
-Execute `npm run lint` e `npm test`. No texto do PR, informe:
+Registre a sessão conforme `AGENTS.md` §15. Execute `npm run lint` e `npm test`
+quando houver impacto executável. No texto do PR, informe:
 
 - o problema resolvido;
 - arquivos e migrations alterados;
