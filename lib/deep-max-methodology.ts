@@ -5,7 +5,7 @@ export type DeepMaxSectionDefinition = {
   criteria: readonly string[];
 };
 
-export const deepMaxMethodologyVersion = "deep-max-v2";
+export const deepMaxMethodologyVersion = "deep-max-v2.1";
 
 export const deepMaxScoreWeights = [
   { code: "income", label: "Renda sustentável", weight: 0.25 },
@@ -34,7 +34,7 @@ export const deepMaxSections: readonly DeepMaxSectionDefinition[] = [
     title: "Leitura documental integral",
     purpose: "Ler o escopo documental página por página, em duas passagens independentes.",
     criteria: [
-      "Seis relatórios gerenciais mais recentes, sem amostragem de páginas",
+      "Dois relatórios gerenciais mais recentes, sem amostragem de páginas",
       "Demonstrações financeiras e parecer de auditoria",
       "Regulamento vigente, fatos relevantes e comunicados",
       "Documentos de emissões, aquisições, vendas e avaliações aplicáveis",
@@ -212,8 +212,8 @@ export const deepMaxSections: readonly DeepMaxSectionDefinition[] = [
 ] as const;
 
 export const deepMaxDocumentMinimums = {
-  managementReports: 6,
-  uniqueManagementCompetencies: 6,
+  managementReports: 2,
+  uniqueManagementCompetencies: 2,
   financialStatements: 3,
   auditedFinancialYears: 3,
   regulations: 1,

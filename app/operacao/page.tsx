@@ -26,6 +26,7 @@ import {
 } from "@/lib/deep-max-methodology";
 import {
   getDocuments,
+  getFinalReport,
   getQueue,
   getReadiness,
   getSections,
@@ -102,10 +103,11 @@ export default async function OperationPage({ searchParams }: OperationPageProps
 
   const ticker = normalizedTicker(params.ticker, queue[0].ticker);
   const selected = queue.find((item) => item.ticker === ticker) ?? queue[0];
-  const [sections, documents, readiness] = await Promise.all([
+  const [sections, documents, readiness, finalReport] = await Promise.all([
     getSections(selected.analysis_run_id),
     getDocuments(selected.analysis_run_id),
     getReadiness(selected.analysis_run_id),
+    getFinalReport(selected.analysis_run_id),
   ]);
 
   const sectionTotal = readiness ? value(readiness.section_total) : sections.length;
@@ -199,6 +201,7 @@ export default async function OperationPage({ searchParams }: OperationPageProps
     selected.confidence_score !== null &&
     selected.action_new_money !== null &&
     selected.action_existing_holder !== null;
+  const qualitativeReportComplete = finalReport?.status === "complete" && finalReport.sections.length >= 6;
   const profileComplete = selected.analysis_profile_status === "verified" && selected.analysis_profile !== "unclassified";
 
   const gates = [
@@ -224,7 +227,7 @@ export default async function OperationPage({ searchParams }: OperationPageProps
     },
     {
       label: "Histórico documental mínimo",
-      detail: `${managementCompetencies}/6 competências gerenciais · ${auditedYears}/3 exercícios auditados · ${regulations}/1 regulamento · ${managementReports} relatórios catalogados`,
+      detail: `${managementCompetencies}/${deepMaxDocumentMinimums.uniqueManagementCompetencies} competências gerenciais · ${auditedYears}/3 exercícios auditados · ${regulations}/1 regulamento · ${managementReports} relatórios catalogados`,
       complete: documentsCatalogued,
       icon: BookOpenCheck,
     },
@@ -261,9 +264,9 @@ export default async function OperationPage({ searchParams }: OperationPageProps
       icon: Database,
     },
     {
-      label: "Veredito e notas liberados",
-      detail: finalFieldsComplete ? "Conclusão preenchida após todos os bloqueios." : "Permanece bloqueado até o esgotamento das etapas anteriores.",
-      complete: profileComplete && finalFieldsComplete && Boolean(readiness?.completion_ready),
+      label: "Relatório qualitativo, veredito e notas liberados",
+      detail: qualitativeReportComplete && finalFieldsComplete ? "Síntese qualitativa final e conclusão quantitativa preenchidas." : "Permanece bloqueado até existir relatório qualitativo final, veredito e notas.",
+      complete: profileComplete && qualitativeReportComplete && finalFieldsComplete && Boolean(readiness?.completion_ready),
       icon: LockKeyhole,
     },
   ];
@@ -439,7 +442,7 @@ export default async function OperationPage({ searchParams }: OperationPageProps
             <div className="grid place-items-center px-6 py-14 text-center">
               <CircleDashed className="size-8 text-slate-600" />
               <p className="mt-4 text-sm font-medium text-white">Nenhum documento cadastrado</p>
-              <p className="mt-2 max-w-xl text-xs leading-5 text-slate-500">O primeiro avanço real do {selected.ticker} será registrar os seis relatórios gerenciais mais recentes e o restante do escopo obrigatório.</p>
+              <p className="mt-2 max-w-xl text-xs leading-5 text-slate-500">O primeiro avanço real do {selected.ticker} será registrar os dois relatórios gerenciais mais recentes e o restante do escopo obrigatório.</p>
             </div>
           )}
         </section>

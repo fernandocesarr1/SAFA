@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, GitCompareArrows, Info, Scale } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, GitCompareArrows, Info, Scale } from "lucide-react";
 
 import { SafaHeader } from "@/components/safa-header";
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getQueue, numberValue, type QueueItem } from "@/lib/safa-data";
+import { getFinalReport, getQueue, numberValue, type FinalAnalysisReport, type QueueItem } from "@/lib/safa-data";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +23,20 @@ function show(value: number | string | null, suffix = "") {
   return parsed === null ? "—" : `${parsed.toFixed(1)}${suffix}`;
 }
 
-function showText(value: string | null) {
-  return value ?? "—";
+const actionLabels: Record<string, string> = {
+  buy: "Comprar",
+  buy_in_tranches: "Comprar em parcelas",
+  wait: "Esperar",
+  avoid: "Evitar",
+  increase: "Aumentar",
+  hold: "Manter",
+  reduce: "Reduzir",
+  sell: "Vender",
+  insufficient_data: "Dados insuficientes",
+};
+
+function showAction(value: string | null) {
+  return value ? (actionLabels[value] ?? value) : "—";
 }
 
 function ComparisonRow({
@@ -58,6 +70,42 @@ function Verdict({ item }: { item: QueueItem }) {
   );
 }
 
+function QualitativeDecision({ ticker, report }: { ticker: string; report: FinalAnalysisReport | null }) {
+  if (!report || report.status !== "complete") {
+    return <p className="p-6 text-sm leading-6 text-slate-500">Relatório qualitativo ainda não concluído.</p>;
+  }
+
+  return (
+    <article className="p-6 sm:p-7">
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-teal-300/70">Tese de {ticker}</p>
+      <h3 className="mt-3 font-serif text-2xl text-white">Conclusão que orienta a decisão</h3>
+      <p className="mt-4 text-sm leading-7 text-slate-300">{report.final_conclusion}</p>
+
+      <div className="mt-7 grid gap-6 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
+        <section>
+          <p className="flex items-center gap-2 text-xs font-medium text-emerald-200"><CheckCircle2 className="size-4" /> Forças que sustentam a tese</p>
+          <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+            {report.strengths.slice(0, 4).map((item) => <li key={item}>• {item}</li>)}
+          </ul>
+        </section>
+        <section>
+          <p className="flex items-center gap-2 text-xs font-medium text-amber-200"><AlertTriangle className="size-4" /> Fragilidades que podem mudar o veredito</p>
+          <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+            {report.weaknesses.slice(0, 4).map((item) => <li key={item}>• {item}</li>)}
+          </ul>
+        </section>
+      </div>
+
+      <section className="mt-7 rounded-xl border border-cyan-300/10 bg-cyan-300/[0.035] p-4">
+        <p className="text-xs font-medium text-cyan-100">Condições para aportar</p>
+        <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+          {report.conditions_to_invest.slice(0, 4).map((item) => <li key={item}>• {item}</li>)}
+        </ul>
+      </section>
+    </article>
+  );
+}
+
 export default async function Comparator({ searchParams }: ComparatorProps) {
   const params = (await searchParams) ?? {};
   const queue = await getQueue();
@@ -67,6 +115,27 @@ export default async function Comparator({ searchParams }: ComparatorProps) {
   const tickerB = normalizedChoice(params.b, queue[1]?.ticker ?? queue[0].ticker);
   const left = queue.find((item) => item.ticker === tickerA) ?? queue[0];
   const right = queue.find((item) => item.ticker === tickerB) ?? queue[1] ?? queue[0];
+  const [leftReport, rightReport] = await Promise.all([
+    getFinalReport(left.analysis_run_id),
+    getFinalReport(right.analysis_run_id),
+  ]);
+  const leftWeighted = numberValue(left.weighted_score);
+  const rightWeighted = numberValue(right.weighted_score);
+  const comparisonDimensions = [
+    ["renda sustentável", numberValue(left.income_score), numberValue(right.income_score)],
+    ["qualidade dos ativos", numberValue(left.quality_score), numberValue(right.quality_score)],
+    ["balanço e caixa", numberValue(left.balance_cash_score), numberValue(right.balance_cash_score)],
+    ["gestão e governança", numberValue(left.management_governance_score), numberValue(right.management_governance_score)],
+    ["valor e margem", numberValue(left.value_margin_score), numberValue(right.value_margin_score)],
+    ["técnico e liquidez", numberValue(left.technical_liquidity_score), numberValue(right.technical_liquidity_score)],
+  ] as const;
+  const largestEdge = comparisonDimensions
+    .filter(([, a, b]) => a !== null && b !== null)
+    .sort((a, b) => Math.abs((b[1] ?? 0) - (b[2] ?? 0)) - Math.abs((a[1] ?? 0) - (a[2] ?? 0)))[0];
+  const leader = leftWeighted !== null && rightWeighted !== null
+    ? (leftWeighted >= rightWeighted ? left : right)
+    : null;
+  const scoreGap = leftWeighted !== null && rightWeighted !== null ? Math.abs(leftWeighted - rightWeighted) : null;
 
   return (
     <div className="min-h-screen bg-[#07111f] text-slate-100">
@@ -136,12 +205,35 @@ export default async function Comparator({ searchParams }: ComparatorProps) {
           <ComparisonRow label="Confiança da análise" left={show(left.confidence_score)} right={show(right.confidence_score)} detail="Cobertura e consistência dos dados disponíveis" />
           <ComparisonRow label="Preço atual" left={show(left.current_price, "")} right={show(right.current_price, "")} />
           <ComparisonRow label="Valor justo base" left={show(left.fair_value_base, "")} right={show(right.fair_value_base, "")} />
-          <ComparisonRow label="Ação para dinheiro novo" left={showText(left.action_new_money)} right={showText(right.action_new_money)} />
-          <ComparisonRow label="Ação para cotista atual" left={showText(left.action_existing_holder)} right={showText(right.action_existing_holder)} />
+          <ComparisonRow label="Ação para dinheiro novo" left={showAction(left.action_new_money)} right={showAction(right.action_new_money)} />
+          <ComparisonRow label="Ação para cotista atual" left={showAction(left.action_existing_holder)} right={showAction(right.action_existing_holder)} />
 
           <div className="grid gap-0 border-t border-white/6 md:grid-cols-2">
             <div className="border-b border-white/6 p-6 md:border-b-0 md:border-r"><p className="mb-2 text-xs font-medium text-teal-300/70">Veredito de {left.ticker}</p><Verdict item={left} /></div>
             <div className="p-6"><p className="mb-2 text-xs font-medium text-teal-300/70">Veredito de {right.ticker}</p><Verdict item={right} /></div>
+          </div>
+        </section>
+
+        {leader && scoreGap !== null && left.ticker !== right.ticker && (
+          <section className="mt-6 rounded-2xl border border-teal-300/15 bg-[linear-gradient(135deg,rgba(20,184,166,.08),rgba(11,24,38,.96)_62%)] p-6 sm:p-7">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-teal-300/70">O que decide a comparação</p>
+            <p className="mt-3 text-base leading-7 text-slate-200">
+              <strong className="text-white">{leader.ticker} lidera por {scoreGap.toFixed(2)} ponto{scoreGap === 1 ? "" : "s"}</strong> na nota ponderada.
+              {largestEdge ? ` A maior diferença entre os seis pilares está em ${largestEdge[0]}.` : ""}
+              {` Para dinheiro novo, a conclusão é ${showAction(leader.action_new_money).toLowerCase()}; o outro fundo permanece em ${showAction(leader.ticker === left.ticker ? right.action_new_money : left.action_new_money).toLowerCase()}.`}
+            </p>
+          </section>
+        )}
+
+        <section className="mt-6 overflow-hidden rounded-2xl border border-white/8 bg-[#0b1826]">
+          <header className="border-b border-white/8 p-6 sm:p-7">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-teal-300/70">Comparação qualitativa</p>
+            <h2 className="mt-2 font-serif text-3xl text-white">Números mostram a diferença; as teses explicam por quê.</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Forças, fragilidades e condições vêm do relatório final de cada fundo, depois das duas leituras integrais.</p>
+          </header>
+          <div className="grid divide-y divide-white/8 md:grid-cols-2 md:divide-x md:divide-y-0">
+            <QualitativeDecision ticker={left.ticker} report={leftReport} />
+            <QualitativeDecision ticker={right.ticker} report={rightReport} />
           </div>
         </section>
 

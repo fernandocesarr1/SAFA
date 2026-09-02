@@ -24,6 +24,7 @@ const gates = [
   `Dados próprios do perfil, dívidas, valuation, premissas, riscos e gatilhos estruturados`,
   `${deepMaxDocumentMinimums.valuationScenarios} cenários, ${deepMaxDocumentMinimums.valuationAssumptions} premissas e ao menos um contramodelo`,
   `Caso contrário, falsificadores e recência dos dados verificados antes da conclusão`,
+  `Relatório qualitativo final com interpretação, forças, fragilidades, decisão e limitações`,
 ];
 
 export default function MethodologyPage() {
@@ -33,12 +34,12 @@ export default function MethodologyPage() {
       <main className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <section className="mb-6 rounded-2xl border border-white/8 bg-[linear-gradient(135deg,rgba(15,31,49,.97),rgba(7,21,34,.94))] p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="border-teal-300/25 bg-teal-300/8 text-teal-100">Deep Max v2</Badge>
+            <Badge variant="outline" className="border-teal-300/25 bg-teal-300/8 text-teal-100">Deep Max v2.1</Badge>
             <Badge variant="outline" className="border-white/10 bg-white/4 text-slate-300">régua auditável</Badge>
           </div>
           <h1 className="mt-5 max-w-4xl font-serif text-3xl text-white sm:text-5xl">O que precisa existir antes de uma nota.</h1>
           <p className="mt-4 max-w-4xl text-sm leading-7 text-slate-300 sm:text-base">
-            O SAFA não considera uma análise completa porque há um relatório, um múltiplo ou uma opinião. A conclusão exige cobertura documental, dados estruturados, duas revisões, contramodelo e regras iguais para fundos do mesmo perfil.
+            O SAFA não considera uma análise completa porque há um múltiplo ou uma opinião isolada. A conclusão exige cobertura documental, dados estruturados, duas revisões, contramodelo e um relatório qualitativo que explique o que os números significam para a tese.
           </p>
         </section>
 
@@ -85,7 +86,7 @@ export default function MethodologyPage() {
               <CardContent className="space-y-3 text-sm leading-6">
                 <div className="rounded-xl border border-emerald-300/15 bg-emerald-300/[0.045] p-4 text-emerald-100/90">
                   <p className="font-medium text-emerald-100">Completa e pontuável</p>
-                  <p className="mt-1">Todos os dados críticos existem, estão recentes e foram verificados. Libera seis notas, ações e ranking.</p>
+                  <p className="mt-1">Todos os dados críticos existem, estão recentes e foram interpretados. Libera relatório qualitativo, seis notas, ações e ranking.</p>
                 </div>
                 <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.045] p-4 text-amber-100/90">
                   <p className="font-medium text-amber-100">Pesquisa esgotada, dados insuficientes</p>

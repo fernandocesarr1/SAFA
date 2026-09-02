@@ -104,8 +104,8 @@ test("keeps the Deep Max v2 methodology exhaustive, weighted and non-duplicated"
     ["technical", 0.05],
   ]);
   assert.deepEqual(deepMaxDocumentMinimums, {
-    managementReports: 6,
-    uniqueManagementCompetencies: 6,
+    managementReports: 2,
+    uniqueManagementCompetencies: 2,
     financialStatements: 3,
     auditedFinancialYears: 3,
     regulations: 1,
@@ -125,7 +125,8 @@ test("keeps database-level completion guards in the canonical schema", async () 
   const base = await readFile(path.join(root, "supabase/schema.sql"), "utf8");
   const patch = await readFile(path.join(root, "supabase/deep_max_v2.sql"), "utf8");
   const prioritizedUniverse = await readFile(path.join(root, "supabase/prioritized_analysis_universe_v1.sql"), "utf8");
-  const schema = `${base}\n${patch}\n${prioritizedUniverse}`;
+  const qualitativeReport = await readFile(path.join(root, "supabase/qualitative_final_report_v1.sql"), "utf8");
+  const schema = `${base}\n${patch}\n${prioritizedUniverse}\n${qualitativeReport}`;
 
   assert.match(schema, /create view public\.v_analysis_readiness/i);
   assert.match(schema, /validate_analysis_run_completion/i);
@@ -141,12 +142,25 @@ test("keeps database-level completion guards in the canonical schema", async () 
   assert.match(schema, /thesis_triggers/i);
   assert.match(schema, /price_count >= 750/i);
   assert.match(schema, /classified_distribution_count >= 36/i);
+  assert.match(schema, /management_unique_competencies >= 2/i);
   assert.match(schema, /new\.income_score \* 0\.25/i);
   assert.match(schema, /analysis_runs_one_active_idx/i);
   assert.match(schema, /somente analise Deep Max integralmente concluida entra no ranking/i);
   assert.match(schema, /validate_analysis_profile/i);
   assert.match(schema, /perfil metodologico precisa ser verificado/i);
   assert.match(schema, /analysis_profile_status/i);
+  assert.match(schema, /validate_qualitative_final_report/i);
+  assert.match(schema, /analise concluida exige relatorio qualitativo final completo/i);
+});
+
+test("uses Deep Max v2.1 with exactly the two latest management reports", async () => {
+  const methodology = await readFile(path.join(root, "lib/deep-max-methodology.ts"), "utf8");
+  const migration = await readFile(path.join(root, "supabase/deep_max_v2_1.sql"), "utf8");
+
+  assert.match(methodology, /deep-max-v2\.1/i);
+  assert.match(methodology, /Dois relatórios gerenciais mais recentes/i);
+  assert.doesNotMatch(methodology, /Seis relatórios gerenciais mais recentes/i);
+  assert.match(migration, /management_unique_competencies >= 2/i);
 });
 
 test("keeps only prioritized tickers without personal, financial or fake analysis data", async () => {

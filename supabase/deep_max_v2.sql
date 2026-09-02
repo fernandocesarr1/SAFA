@@ -1313,7 +1313,7 @@ select
     and readiness_counts.second_documents_complete = readiness_counts.documents_total
     and readiness_counts.first_pages_ready
     and readiness_counts.second_pages_ready
-    and readiness_counts.management_unique_competencies >= 6
+    and readiness_counts.management_unique_competencies >= 2
     and readiness_counts.audited_financial_years >= 3
     and readiness_counts.regulations >= 1
     and readiness_counts.distribution_count >= 36

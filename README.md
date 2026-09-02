@@ -1,6 +1,6 @@
 # SAFA
 
-Sistema pessoal de Análise de FIIs e Ações. A primeira fase cobre FIIs de tijolo acessíveis ao investidor comum; a mesma base aceitará ações quando o método estiver estabilizado.
+Sistema pessoal de Análise de FIIs e Ações. A primeira fase cobre FIIs acessíveis ao investidor comum, com régua específica por perfil; a mesma base aceitará ações quando o método estiver estabilizado.
 
 ## Estado atual
 
@@ -9,12 +9,13 @@ Sistema pessoal de Análise de FIIs e Ações. A primeira fase cobre FIIs de tij
 - ficha individual com 16 blocos, 80 critérios universais e 5 critérios por segmento;
 - controle separado de documentos e páginas na primeira leitura e na releitura;
 - séries de fundamentos, dividendos e preços no Supabase;
-- comparador que preserva lacunas como “não avaliado”;
+- relatório qualitativo final obrigatório, além dos indicadores quantitativos;
+- comparador numérico e qualitativo que preserva lacunas como “não avaliado”;
 - seis dimensões comparáveis com pesos versionados, risco e confiança separados;
 - ações distintas para dinheiro novo e para quem já possui cotas;
 - tabelas normalizadas para imóveis, locatários, contratos, dívidas, valuation, premissas, riscos e gatilhos.
 
-O banco bloqueia notas e ranking enquanto não forem cumpridos todos os requisitos do Deep Max v2: elegibilidade verificada, 16 áreas e 80 + 5 critérios concluídos em duas passagens, 9 escopos documentais e 8 escopos estruturados esgotados, 6 competências gerenciais recentes, 3 exercícios com notas e auditoria, 36 distribuições classificadas, 750 pregões em ao menos 3 anos, 32 métricas universais + 5 do segmento, três cenários, 12 premissas, contramodelo, riscos e falsificadores.
+O banco bloqueia notas e ranking enquanto não forem cumpridos todos os requisitos do Deep Max v2.1: perfil e elegibilidade verificados, 16 áreas e 80 + 5 critérios concluídos em duas passagens, 9 escopos documentais e 8 escopos estruturados esgotados, os 2 relatórios gerenciais mais recentes, 3 exercícios com notas e auditoria, 36 distribuições classificadas, 750 pregões em ao menos 3 anos, 32 métricas universais + 5 do segmento, três cenários, 12 premissas, contramodelo, riscos, falsificadores e relatório qualitativo final.
 
 Se a busca foi integralmente esgotada, mas uma evidência crítica não existe ou não está disponível, a análise pode terminar somente como `insufficient_data`: sem notas e fora do ranking.
 
@@ -31,11 +32,17 @@ A nota ponderada é calculada pelo banco. Entradas do ranking são derivadas exc
 
 ## Arquitetura
 
+- fonte oficial: GitHub, branch `main`;
 - interface: Next.js/Vinext, preparada para execução em Cloudflare Workers;
 - dados: Supabase/Postgres com RLS e acesso público somente para leitura;
-- esquema reproduzível: execute `supabase/schema.sql` e depois `supabase/deep_max_v2.sql`;
+- hospedagem atual: ChatGPT Sites, alimentado por um espelho do código aprovado no GitHub;
+- esquema reproduzível: migrations SQL versionadas em `supabase/`;
 - escrita: restrita ao administrador e aos processos de análise.
 
 Os PDFs e imagens de relatórios não são guardados. O banco mantém somente referências, competência, contagem de páginas, números estruturados e conclusões necessárias para decisão.
 
-O repositório não contém resultados fabricados nem reaproveita vereditos antigos sem evidência. Os dez FIIs iniciais permanecem corretamente no backlog até a coleta e as duas revisões serem executadas.
+O repositório não contém resultados fabricados nem reaproveita vereditos antigos sem evidência. O estado operacional das análises fica no Supabase e não deve ser substituído por dados fictícios no código.
+
+## Colaboração
+
+Claude, Codex e colaboradores humanos trabalham em branches próprias e integram mudanças por pull request. Consulte [CONTRIBUTING.md](CONTRIBUTING.md). Instruções específicas para Claude estão em [CLAUDE.md](CLAUDE.md).

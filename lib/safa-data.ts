@@ -161,6 +161,86 @@ export type RankingEntry = {
   rationale: string;
 };
 
+export type MetricObservation = {
+  metric_code: string;
+  reference_date: string;
+  value_numeric: number | string | null;
+  value_text: string | null;
+  source_url: string | null;
+};
+
+export type ValuationScenario = {
+  scenario_code: "pessimistic" | "base" | "optimistic";
+  horizon_months: number;
+  model_method: string;
+  expected_income_per_share: number | string | null;
+  fair_value_per_share: number | string;
+  expected_total_return_pct: number | string | null;
+  probability_pct: number | string | null;
+  counter_model_method: string | null;
+  counter_model_value_per_share: number | string | null;
+  notes: string;
+};
+
+export type RiskItem = {
+  risk_code: string;
+  category: string;
+  description: string;
+  probability_score: number;
+  impact_score: number;
+  quantified_loss_pct: number | string | null;
+  mitigants: string;
+  warning_signals: string;
+  stress_test_result: string;
+};
+
+export type ThesisTrigger = {
+  trigger_code: string;
+  trigger_type: string;
+  description: string;
+  threshold_numeric: number | string | null;
+  threshold_text: string | null;
+  status: string;
+};
+
+export type CashDistribution = {
+  reference_date: string;
+  amount_per_share: number | string;
+  recurring_amount_per_share: number | string | null;
+  classification: string;
+};
+
+export type MarketPrice = {
+  price_date: string;
+  close_price: number | string;
+};
+
+export type FundTenant = {
+  name: string;
+  sector: string | null;
+  revenue_share_pct: number | string | null;
+};
+
+export type QualitativeReportSection = {
+  code: string;
+  title: string;
+  content: string;
+};
+
+export type FinalAnalysisReport = {
+  status: string;
+  version: string | null;
+  generated_at: string | null;
+  title: string;
+  executive_summary: string;
+  final_conclusion: string;
+  sections: QualitativeReportSection[];
+  strengths: string[];
+  weaknesses: string[];
+  conditions_to_invest: string[];
+  limitations: string[];
+};
+
 const initialTickers = [
   "TRXF11", "GGRC11", "RBRY11", "MXRF11", "AAZQ11", "SNEL11", "GARE11",
   "KNSC11", "CPSH11", "HGCR11", "BRCR11", "NSLU11", "RBVA11", "TGAR11",
@@ -188,7 +268,7 @@ const fallbackQueue: QueueItem[] = initialTickers.map((ticker, index) => ({
   analysis_profile_verified_at: null,
   analysis_run_id: index + 1,
   version: 1,
-  methodology_version: "deep-max-v2",
+  methodology_version: "deep-max-v2.1",
   status: "backlog",
   coverage_pct: 0,
   verdict: null,
@@ -337,6 +417,90 @@ export async function getCurrentRanking(): Promise<RankingEntry[]> {
   } catch {
     return [];
   }
+}
+
+export async function getMetrics(runId: number | null): Promise<MetricObservation[]> {
+  if (!runId) return [];
+  try {
+    return await select<MetricObservation>(
+      `metric_observations?select=metric_code,reference_date,value_numeric,value_text,source_url&analysis_run_id=eq.${runId}&order=metric_code.asc`,
+    );
+  } catch { return []; }
+}
+
+export async function getValuationScenarios(runId: number | null): Promise<ValuationScenario[]> {
+  if (!runId) return [];
+  try {
+    return await select<ValuationScenario>(
+      `valuation_scenarios?select=scenario_code,horizon_months,model_method,expected_income_per_share,fair_value_per_share,expected_total_return_pct,probability_pct,counter_model_method,counter_model_value_per_share,notes&analysis_run_id=eq.${runId}&order=fair_value_per_share.asc`,
+    );
+  } catch { return []; }
+}
+
+export async function getRisks(runId: number | null): Promise<RiskItem[]> {
+  if (!runId) return [];
+  try {
+    return await select<RiskItem>(
+      `risk_register?select=risk_code,category,description,probability_score,impact_score,quantified_loss_pct,mitigants,warning_signals,stress_test_result&analysis_run_id=eq.${runId}&order=impact_score.desc,probability_score.desc`,
+    );
+  } catch { return []; }
+}
+
+export async function getTriggers(runId: number | null): Promise<ThesisTrigger[]> {
+  if (!runId) return [];
+  try {
+    return await select<ThesisTrigger>(
+      `thesis_triggers?select=trigger_code,trigger_type,description,threshold_numeric,threshold_text,status&analysis_run_id=eq.${runId}&order=trigger_type.asc`,
+    );
+  } catch { return []; }
+}
+
+export async function getDistributions(runId: number | null): Promise<CashDistribution[]> {
+  if (!runId) return [];
+  try {
+    return await select<CashDistribution>(
+      `cash_distributions?select=reference_date,amount_per_share,recurring_amount_per_share,classification&analysis_run_id=eq.${runId}&order=reference_date.asc`,
+    );
+  } catch { return []; }
+}
+
+export async function getPrices(instrumentId: number): Promise<MarketPrice[]> {
+  try {
+    return await select<MarketPrice>(
+      `market_prices?select=price_date,close_price&instrument_id=eq.${instrumentId}&order=price_date.asc`,
+    );
+  } catch { return []; }
+}
+
+export async function getTopTenants(runId: number | null): Promise<FundTenant[]> {
+  if (!runId) return [];
+  try {
+    return await select<FundTenant>(
+      `fund_tenants?select=name,sector,revenue_share_pct&analysis_run_id=eq.${runId}&revenue_share_pct=not.is.null&order=revenue_share_pct.desc&limit=10`,
+    );
+  } catch { return []; }
+}
+
+export async function getFinalReport(runId: number | null): Promise<FinalAnalysisReport | null> {
+  if (!runId) return null;
+  try {
+    const rows = await select<{
+      final_report_status: string;
+      final_report_version: string | null;
+      final_report_generated_at: string | null;
+      final_report: Omit<FinalAnalysisReport, "status" | "version" | "generated_at"> | null;
+    }>(
+      `analysis_runs?select=final_report_status,final_report_version,final_report_generated_at,final_report&id=eq.${runId}&limit=1`,
+    );
+    const row = rows[0];
+    if (!row?.final_report) return null;
+    return {
+      status: row.final_report_status,
+      version: row.final_report_version,
+      generated_at: row.final_report_generated_at,
+      ...row.final_report,
+    };
+  } catch { return null; }
 }
 
 export async function getUniverseStats(): Promise<UniverseStats> {
