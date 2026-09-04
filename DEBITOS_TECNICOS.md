@@ -73,26 +73,38 @@ A auditoria de nomes contra hash confirmou a tabela original em cheio: dos
 quatro arquivos com nome de migration, só `prioritized_analysis_universe_v1.sql`
 conferia.
 
-**Permanece em aberto — o replay ainda não reproduz o banco:**
+**Replay verificado em 04/09/2026.** As 11 tabelas fundacionais sem `create
+table` no livro-razão — `instruments`, `analysis_runs`, `analysis_sections`,
+`source_documents`, `metric_definitions`, `metric_observations`,
+`cash_distributions`, `market_prices`, `material_events`, `ranking_snapshots`,
+`ranking_entries` — foram criadas antes de o projeto adotar `apply_migration`.
+**O SQL fora do livro-razão é anterior a ele, não posterior.** Reconstruídas em
+`00000000000000_baseline_pre_ledger.sql`; o órfão `qualitative_final_report_v1`,
+em `99999999999999_qualitative_final_report_out_of_ledger.sql`. Nenhuma linha
+foi inserida no livro-razão para representá-los.
 
-- **11 tabelas fundacionais sem `create table` no livro-razão:** `instruments`,
-  `analysis_runs`, `analysis_sections`, `source_documents`,
-  `metric_definitions`, `metric_observations`, `cash_distributions`,
-  `market_prices`, `material_events`, `ranking_snapshots`, `ranking_entries`.
-  Foram criadas antes de o projeto adotar `apply_migration`, e esse SQL não foi
-  preservado. **O SQL fora do livro-razão é anterior a ele, não posterior.**
-- `qualitative_final_report_v1` continua aplicado fora do livro-razão: nenhuma
-  migration menciona `final_report` e os objetos estão vivos.
-- Ambos foram reconstruídos a partir do catálogo do banco vivo em
-  `supabase/migrations/00000000000000_baseline_pre_ledger.sql`, **rotulado no
-  próprio arquivo como reconstrução declarada e não verificada**. Nenhuma linha
-  foi inserida no livro-razão para representá-lo: forjar essa entrada
-  falsificaria o registro que a reconciliação existe para consertar.
-- **O baseline só é aceito depois de replay num Postgres limpo** (baseline mais
-  as seis migrations, em ordem), comparado ao banco vivo por `pg_class`,
-  `pg_proc`, `pg_constraint`, `pg_trigger` e `pg_policies`. O replay não foi
-  executado: a máquina da sessão não tinha Docker nem `psql`. Até lá, o baseline
-  é esta mesma dívida com outro nome.
+Replay em Postgres 17.2 limpo (produção roda 17.6.1): os oito arquivos aplicam
+sem erro e produzem assinatura estrutural equivalente à de produção — 938 linhas
+dos dois lados, 936 idênticas, cobrindo colunas, constraints, índices, triggers,
+funções, políticas, RLS e definição das views. As duas diferenças são um par de
+parênteses externos na reconstrução de dois `CHECK` de `ranking_entries`,
+idênticas ignorando agrupamento; normalização de deparse entre versões.
+
+O replay achou um defeito real e o corrigiu: as colunas `final_report*` estavam
+no baseline e faziam `v_analysis_queue` — criada com `select candidate.*`, que
+congela a lista de colunas — sair com quatro colunas a mais. Foram movidas para
+o arquivo do órfão, que roda depois das seis migrations. **É a demonstração de
+por que baseline sem replay não vale: a inspeção não teria pego isso.**
+
+**Permanece em aberto:**
+
+- `qualitative_final_report_v1` segue sem registro do texto executado. O arquivo
+  reproduz o estado vivo e foi verificado por replay, mas não há prova de que
+  seja idêntico ao SQL originalmente aplicado, e ele continua ausente do
+  livro-razão. Formalizá-lo exige aplicar migration em produção — decisão de
+  Fernando, não ação técnica neutra.
+- As 11 fundacionais permanecem sem texto de origem. Isso é irrecuperável: o
+  SQL não foi preservado. A garantia disponível é de resultado, não de origem.
 
 ### D6 — ~~`deep_max_v2.sql` editado retroativamente~~ · REESCRITO em 03/09/2026
 Cirurgia textual sobre definição de view: a `deep_max_v2_1` lê a definição com

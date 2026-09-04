@@ -22,9 +22,10 @@
 --     metric_definitions, metric_observations, cash_distributions,
 --     market_prices, material_events, ranking_snapshots, ranking_entries
 --
---   mais os objetos de qualitative_final_report_v1, aplicados fora do
---   livro-razão: safa_private.validate_qualitative_final_report e o trigger
---   zz_validate_qualitative_final_report.
+--   NÃO inclui os objetos de qualitative_final_report_v1. Eles também estão
+--   fora do livro-razão, mas foram aplicados DEPOIS das seis migrations, e a
+--   ordem importa: ficam em
+--   99999999999999_qualitative_final_report_out_of_ledger.sql.
 --
 --   Não inclui as 17 tabelas nem as 4 views criadas pelo livro-razão, nem as
 --   6 funções e 5 triggers que dele constam. Esses têm arquivo próprio.
@@ -32,11 +33,19 @@
 -- DUAS RESSALVAS QUE MUDAM COMO ESTE ARQUIVO DEVE SER LIDO
 --
 -- 1. Extraído do estado ATUAL, este baseline já contém colunas que na verdade
---    foram acrescentadas depois pelas migrations do livro-razão (por exemplo as
---    colunas de dupla passagem em analysis_sections e source_documents, da
---    20260901005500, e as colunas final_report* em analysis_runs, do órfão).
---    Em replay, os "add column if not exists" dessas migrations viram no-op. O
---    estado final é o mesmo; a atribuição histórica de cada coluna, não.
+--    foram acrescentadas depois pelas migrations do livro-razão — por exemplo
+--    as colunas de dupla passagem em analysis_sections e source_documents, da
+--    20260901005500. Em replay, os "add column if not exists" dessas migrations
+--    viram no-op. O estado final é o mesmo; a atribuição histórica de cada
+--    coluna, não.
+--
+--    Isso NÃO é inofensivo em todos os casos, e o replay provou: as colunas
+--    final_report* precisaram sair daqui. A view v_analysis_queue é criada com
+--    "select candidate.*", que congela a lista de colunas no instante da
+--    criação. Com essas colunas presentes desde o início, a view saía do replay
+--    com quatro colunas a mais do que tem em produção. Foram movidas para
+--    99999999999999_qualitative_final_report_out_of_ledger.sql, que roda depois
+--    das seis migrations — a ordem real.
 --
 -- 2. "create table if not exists" PULA tabela existente com estrutura
 --    diferente, sem erro e sem aviso. Rodar este arquivo contra um banco que já
@@ -44,14 +53,21 @@
 --    de sucesso. Ele é inofensivo contra a produção por construção, e é isso
 --    que essa idempotência garante: nada além disso.
 --
--- ESTADO DE ACEITAÇÃO: NÃO VERIFICADO
+-- ESTADO DE ACEITAÇÃO: VERIFICADO POR REPLAY EM 2026-09-04
 --
--- Este baseline só passa a valer depois de replay num Postgres limpo
--- (baseline + as seis migrations, em ordem de versão), com o resultado
--- comparado ao banco vivo por pg_class, pg_proc, pg_constraint, pg_trigger e
--- pg_policies. Enquanto esse replay não for executado e registrado, este
--- arquivo é dívida técnica com outro nome, e o replay do diretório NÃO
--- reproduz o banco de produção.
+-- Replay executado em PostgreSQL 17.2 limpo (produção roda 17.6.1): baseline,
+-- as seis migrations em ordem de versão e o arquivo do órfão. Todos aplicaram
+-- sem erro. A assinatura estrutural resultante foi comparada com a do banco
+-- vivo — colunas com tipo, NOT NULL, default e identity; constraints;
+-- índices; triggers; funções; políticas; RLS; e definição das views.
+--
+-- Resultado: equivalente. As duas únicas diferenças textuais remanescentes são
+-- em ranking_entries_score_range e ranking_entries_v2_score_range, e consistem
+-- em um par de parênteses externos na reconstrução do CHECK — idênticas
+-- ignorando agrupamento, e AND é associativo. É normalização de deparse entre
+-- 17.6 e 17.2, não divergência de schema.
+--
+-- Método e números no registro da sessão em docs/sessions/.
 --
 -- Ordena antes das seis migrations porque a 20260901005500 faz alter table em
 -- analysis_sections e source_documents, que precisam existir antes.
@@ -91,11 +107,7 @@ create table if not exists public.analysis_runs (
   technical_liquidity_score numeric(4,2),
   weighted_score numeric(4,2),
   action_new_money text,
-  action_existing_holder text,
-  final_report_status text default 'pending'::text not null,
-  final_report_version text,
-  final_report_generated_at timestamp with time zone,
-  final_report jsonb
+  action_existing_holder text
 );
 
 create table if not exists public.analysis_sections (
@@ -452,20 +464,6 @@ do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'analysis_runs_fair_value_order' and conrelid = 'public.analysis_runs'::regclass) then
     alter table public.analysis_runs add constraint analysis_runs_fair_value_order CHECK (((fair_value_low IS NULL) OR (fair_value_base IS NULL) OR (fair_value_high IS NULL) OR ((fair_value_low <= fair_value_base) AND (fair_value_base <= fair_value_high))));
-  end if;
-end $$;
-
-do $$
-begin
-  if not exists (select 1 from pg_constraint where conname = 'analysis_runs_final_report_object' and conrelid = 'public.analysis_runs'::regclass) then
-    alter table public.analysis_runs add constraint analysis_runs_final_report_object CHECK (((final_report IS NULL) OR (jsonb_typeof(final_report) = 'object'::text)));
-  end if;
-end $$;
-
-do $$
-begin
-  if not exists (select 1 from pg_constraint where conname = 'analysis_runs_final_report_status' and conrelid = 'public.analysis_runs'::regclass) then
-    alter table public.analysis_runs add constraint analysis_runs_final_report_status CHECK ((final_report_status = ANY (ARRAY['pending'::text, 'complete'::text, 'insufficient_data'::text])));
   end if;
 end $$;
 
@@ -1245,65 +1243,3 @@ grant SELECT on public.source_documents to service_role;
 grant TRIGGER on public.source_documents to service_role;
 grant TRUNCATE on public.source_documents to service_role;
 grant UPDATE on public.source_documents to service_role;
-
--- [7] SCHEMA PRIVADO E OBJETOS DO qualitative_final_report_v1 (fora do livro-razao)
-
-create schema if not exists safa_private;
-
-CREATE OR REPLACE FUNCTION safa_private.validate_qualitative_final_report()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO ''
-AS $function$
-begin
-  if new.final_report_status = 'complete' then
-    if new.final_report is null or pg_catalog.jsonb_typeof(new.final_report) <> 'object' then
-      raise exception 'SAFA: relatorio qualitativo completo precisa ser um objeto estruturado';
-    end if;
-    if nullif(pg_catalog.btrim(new.final_report->>'title'), '') is null
-      or nullif(pg_catalog.btrim(new.final_report->>'executive_summary'), '') is null
-      or nullif(pg_catalog.btrim(new.final_report->>'final_conclusion'), '') is null
-      or nullif(pg_catalog.btrim(new.final_report_version), '') is null
-    then
-      raise exception 'SAFA: relatorio qualitativo exige titulo, resumo executivo, conclusao e versao';
-    end if;
-    if pg_catalog.jsonb_typeof(new.final_report->'sections') <> 'array'
-      or pg_catalog.jsonb_typeof(new.final_report->'strengths') <> 'array'
-      or pg_catalog.jsonb_typeof(new.final_report->'weaknesses') <> 'array'
-      or pg_catalog.jsonb_typeof(new.final_report->'conditions_to_invest') <> 'array'
-      or pg_catalog.jsonb_typeof(new.final_report->'limitations') <> 'array'
-    then
-      raise exception 'SAFA: secoes, forcas, fragilidades, condicoes e limitacoes precisam ser listas';
-    end if;
-    if pg_catalog.jsonb_array_length(new.final_report->'sections') < 6
-      or pg_catalog.jsonb_array_length(new.final_report->'strengths') = 0
-      or pg_catalog.jsonb_array_length(new.final_report->'weaknesses') = 0
-      or pg_catalog.jsonb_array_length(new.final_report->'conditions_to_invest') = 0
-    then
-      raise exception 'SAFA: relatorio qualitativo nao cobre o escopo minimo';
-    end if;
-    if exists (
-      select 1
-      from pg_catalog.jsonb_array_elements(new.final_report->'sections') section
-      where nullif(pg_catalog.btrim(section->>'code'), '') is null
-        or nullif(pg_catalog.btrim(section->>'title'), '') is null
-        or nullif(pg_catalog.btrim(section->>'content'), '') is null
-    ) then
-      raise exception 'SAFA: toda secao qualitativa exige codigo, titulo e conteudo';
-    end if;
-    new.final_report_generated_at := coalesce(new.final_report_generated_at, pg_catalog.now());
-  else
-    new.final_report_generated_at := null;
-  end if;
-
-  if new.status = 'completed' and new.final_report_status <> 'complete' then
-    raise exception 'SAFA: analise concluida exige relatorio qualitativo final completo';
-  end if;
-
-  return new;
-end;
-$function$
-;
-
-drop trigger if exists zz_validate_qualitative_final_report on public.analysis_runs;
-CREATE TRIGGER zz_validate_qualitative_final_report BEFORE INSERT OR UPDATE ON public.analysis_runs FOR EACH ROW EXECUTE FUNCTION safa_private.validate_qualitative_final_report();
