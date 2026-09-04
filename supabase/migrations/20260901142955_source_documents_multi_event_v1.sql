@@ -1,0 +1,1 @@
+begin; drop index if exists public.source_documents_run_current_competence_unique; create index if not exists source_documents_run_current_competence_idx on public.source_documents (analysis_run_id, document_type, competence_date) where is_current_version and competence_date is not null; commit;

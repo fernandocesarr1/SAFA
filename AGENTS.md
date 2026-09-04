@@ -9,6 +9,7 @@ regras por conta própria.
 Este arquivo contém apenas normas estáveis. Dívidas técnicas ficam em
 `DEBITOS_TECNICOS.md`; registros de sessão em `docs/sessions/`.
 
+Versão 4 — acrescenta a quarta exigência de auditoria em §17, 03/09/2026.
 Versão 3 — após duas rodadas de revisão cruzada entre assistentes, 01/09/2026.
 
 ---
@@ -360,7 +361,7 @@ virar ação. O ciclo já pegou erros reais dos dois lados: prova mal formulada,
 teste inválido, contagem desatualizada, comparação contra a referência errada e
 afirmação sobre decisão de Fernando sem base.
 
-Três exigências ao auditar:
+Quatro exigências ao auditar:
 
 1. **Mostrar o teste.** Ao contestar um achado, a exigência é a mesma que se
    cobra do dado.
@@ -371,3 +372,16 @@ Três exigências ao auditar:
    não se consultou.** Apontar a ambiguidade é legítimo; declarar para que lado
    ela enviesa exige prova. E o histórico de decisões de Fernando não é inferível
    a partir do estado do banco.
+
+4. **Saída truncada é dado ausente, não dado lido.** Consulta cujo resultado
+   estourou o limite e foi gravada em arquivo só conta como lida depois de o
+   arquivo ser aberto. Seguir a análise com o que sobrou na tela — ou com o
+   resultado da consulta vizinha — é afirmar ter feito uma comparação que não se
+   fez. Quando o volume impedir a leitura, o desfecho correto é reduzir a
+   consulta até caber, ou levar o conteúdo ao disco por meio programático e
+   provar por hash. **Nunca transcrever à mão o que precisa ser fiel.**
+
+Estas duas últimas nasceram de erros reais, um de cada lado: a prova do
+`scale()` que media o tipo da coluna, e a leitura de uma migration pelo texto da
+migration anterior, cujo resultado verdadeiro havia sido truncado para arquivo e
+não foi aberto.

@@ -55,30 +55,66 @@ entre critério, documento, página e conclusão.
 
 ## Reprodutibilidade do schema
 
-### D5 — Cinco das seis migrations sem reprodução exata
-| Migration no banco | Situação no repositório |
-|---|---|
-| `deep_max_operational_controls` | sem arquivo idêntico |
-| `deep_max_v2_auditable_analysis` | `deep_max_v2.sql` existe, conteúdo diferente |
-| `deep_max_v2_fk_indexes` | sem arquivo próprio |
-| `prioritized_analysis_universe_v1` | única correspondência exata |
-| `deep_max_v2_1` | arquivo existe, SQL diferente do aplicado |
-| `source_documents_multi_event_v1` | arquivo existe, altera índices diferentes |
+### D5 — ~~Cinco das seis migrations sem reprodução exata~~ · PARCIALMENTE RESOLVIDO em 03/09/2026
+Estado original: cinco das seis migrations não tinham reprodução exata no
+repositório, que sequer possuía `supabase/migrations/`.
 
-Além disso: `qualitative_final_report_v1.sql` está no repositório e seus objetos
-estão no banco, **mas não há migration correspondente no livro-razão**.
+**Resolvido na sessão de reconciliação de 03/09/2026:** as seis migrations foram
+extraídas de `supabase_migrations.schema_migrations` — que guarda o texto
+literalmente executado por `apply_migration` — e gravadas em
+`supabase/migrations/<versão>_<nome>.sql`. O hash de cada arquivo confere byte a
+byte com o registro do banco; a conferência está no registro da sessão e no
+`README.md` do diretório. Os arquivos soltos foram para `supabase/snapshots/`
+sem exclusão, com seu status probatório documentado. `.gitattributes` fixa
+`*.sql text eol=lf`, sem o que o checkout no Windows grava CRLF e nenhuma
+comparação de hash confere.
 
-O repositório não possui `supabase/migrations/`. Os arquivos estão soltos em
-`supabase/`, misturando snapshots, scripts de implantação e SQL aplicado.
+A auditoria de nomes contra hash confirmou a tabela original em cheio: dos
+quatro arquivos com nome de migration, só `prioritized_analysis_universe_v1.sql`
+conferia.
 
-### D6 — `deep_max_v2.sql` editado retroativamente
-O limiar de relatórios gerenciais foi alterado de 6 para 2 dentro de arquivo que
-representa migration já aplicada. A `deep_max_v2_1` faz cirurgia textual (lê a
-definição da view e troca `>= 6` por `>= 2`); numa recriação limpa o texto já
-está em 2, a troca não encontra nada e **a migration passa sem efeito e sem erro**.
+**Permanece em aberto — o replay ainda não reproduz o banco:**
 
-O problema aqui é de **reprodutibilidade e técnica de migration**, não de mérito
-da decisão — ver D7.
+- **11 tabelas fundacionais sem `create table` no livro-razão:** `instruments`,
+  `analysis_runs`, `analysis_sections`, `source_documents`,
+  `metric_definitions`, `metric_observations`, `cash_distributions`,
+  `market_prices`, `material_events`, `ranking_snapshots`, `ranking_entries`.
+  Foram criadas antes de o projeto adotar `apply_migration`, e esse SQL não foi
+  preservado. **O SQL fora do livro-razão é anterior a ele, não posterior.**
+- `qualitative_final_report_v1` continua aplicado fora do livro-razão: nenhuma
+  migration menciona `final_report` e os objetos estão vivos.
+- Ambos foram reconstruídos a partir do catálogo do banco vivo em
+  `supabase/migrations/00000000000000_baseline_pre_ledger.sql`, **rotulado no
+  próprio arquivo como reconstrução declarada e não verificada**. Nenhuma linha
+  foi inserida no livro-razão para representá-lo: forjar essa entrada
+  falsificaria o registro que a reconciliação existe para consertar.
+- **O baseline só é aceito depois de replay num Postgres limpo** (baseline mais
+  as seis migrations, em ordem), comparado ao banco vivo por `pg_class`,
+  `pg_proc`, `pg_constraint`, `pg_trigger` e `pg_policies`. O replay não foi
+  executado: a máquina da sessão não tinha Docker nem `psql`. Até lá, o baseline
+  é esta mesma dívida com outro nome.
+
+### D6 — ~~`deep_max_v2.sql` editado retroativamente~~ · REESCRITO em 03/09/2026
+Cirurgia textual sobre definição de view: a `deep_max_v2_1` lê a definição com
+`pg_get_viewdef`, troca `management_unique_competencies >= 6` por `>= 2` e
+recria a view. **Hoje está protegida por guarda e funcionando** — a migration
+tem `raise exception` caso a substituição não encontre o alvo, de modo que
+falharia alto, não em silêncio.
+
+**Não é no-op.** Verificado: a `deep_max_v2_auditable_analysis` contém `>= 6` e
+não contém `>= 2`; a substituição encontrou o alvo e teve efeito.
+
+A dívida que permanece é de técnica: **substituir por recriação integral do
+objeto na próxima vez que a view for tocada**, conforme `AGENTS.md` §9.3.
+
+> *Correção:* a formulação anterior afirmava que a migration passava sem efeito
+> e sem erro. Ela julgou a migration pelo **arquivo solto**
+> (`deep_max_v2_1.sql`, hash `e4b73be4…`), que de fato não tem a guarda — e não
+> pelo SQL aplicado, registrado no livro-razão com hash `b24e3a13…`. São textos
+> diferentes. É exatamente o defeito que o D5 descreve, aplicado contra quem o
+> escreveu.
+
+O mérito da decisão de 6 para 2 é assunto do D7, e está ratificado.
 
 ### D7 — ~~Redução de rigor sem decisão~~ · RATIFICADA
 A redução de 6 para 2 relatórios gerenciais foi **determinada expressamente por
