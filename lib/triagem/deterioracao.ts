@@ -177,7 +177,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "concentracao_inquilino",
       "Concentração em um inquilino",
-      "documental",
+      "quantitativo",
       e.concentracaoMaiorInquilinoPct !== undefined
         ? {
             presente: e.concentracaoMaiorInquilinoPct >= LIMIARES.concentracaoCritica,
@@ -191,7 +191,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "muro_vencimentos",
       "Contratos vencendo em 24 meses",
-      "documental",
+      "quantitativo",
       e.contratosVencendo24mPct !== undefined
         ? {
             presente: e.contratosVencendo24mPct >= LIMIARES.contratosVencendo24mCritica,

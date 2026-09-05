@@ -18,6 +18,15 @@ import {
   parseGeral,
 } from "../../lib/coleta/cvm/parser.ts";
 import { montarPreRanking, resumir } from "../../lib/triagem/pre-ranking.ts";
+import {
+  ARQUIVOS_TRIMESTRAL,
+  concentracaoMaiorInquilino,
+  desacumularPorExercicio,
+  parseContratos,
+  parseInquilinos,
+  parseResultado,
+  urlInformeTrimestral,
+} from "../../lib/coleta/cvm/trimestral.ts";
 
 // Anos a considerar. Vários, porque desconto é distância do topo e o topo
 // costuma estar em outro ano-calendário: uma janela de 12 meses só enxerga o
@@ -96,12 +105,46 @@ console.log(
   `      total: ${cadastro.length} registros de cadastro · ${complementos.length} complementos`,
 );
 
-console.log("\n[3/3] Cruzamento e decomposição...");
+console.log("\n[3/4] Informe Trimestral da CVM (segunda fonte de renda)...");
+const contratosTrimestrais = [];
+const resultadosTrimestrais = [];
+const inquilinos = [];
+for (const ano of anos) {
+  try {
+    const arq = await baixarArquivo(urlInformeTrimestral(ano), { timeoutMs: 300_000 });
+    const csvs = extrairArquivos(arq.conteudo);
+    const achar = (re: RegExp) => {
+      const a = csvs.find((c) => re.test(c.nome));
+      if (!a) throw new Error(`arquivo ausente: ${re}`);
+      return a.conteudo.toString("latin1");
+    };
+    contratosTrimestrais.push(...parseContratos(achar(ARQUIVOS_TRIMESTRAL.complemento)));
+    inquilinos.push(...parseInquilinos(achar(ARQUIVOS_TRIMESTRAL.inquilino)));
+    // desacumula: Rendimentos_Declarados é acumulado no exercício
+    resultadosTrimestrais.push(
+      ...desacumularPorExercicio(parseResultado(achar(ARQUIVOS_TRIMESTRAL.resultado))),
+    );
+    console.log(`      ${ano}: sha256 ${arq.hashSha256.slice(0, 12)}…`);
+  } catch (erro) {
+    console.log(
+      `      ${ano}: indisponível (${erro instanceof Error ? erro.message : erro})`,
+    );
+  }
+}
+const concentracaoPorFundo = concentracaoMaiorInquilino(inquilinos);
+console.log(
+  `      total: ${resultadosTrimestrais.length} resultados · ${concentracaoPorFundo.size} fundos com concentração medida`,
+);
+
+console.log("\n[4/4] Cruzamento e decomposição...");
 const triagem = montarPreRanking({
   cotacoesPorTicker: porTicker(cotacoes),
   cadastro,
   complementos,
   ativoPassivo,
+  contratosTrimestrais,
+  concentracaoPorFundo,
+  resultadosTrimestrais,
 });
 
 const limite = Number(process.env.SAFA_TOP ?? 25);

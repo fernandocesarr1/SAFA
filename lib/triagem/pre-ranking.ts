@@ -33,12 +33,33 @@ import {
   type Maturidade,
   type MotivoExclusao,
 } from "./elegibilidade.ts";
+import type {
+  ContratosTrimestral,
+  ResultadoTrimestral,
+} from "../coleta/cvm/trimestral.ts";
+import {
+  rendaTrimestralPorCota,
+  urlInformeTrimestral,
+} from "../coleta/cvm/trimestral.ts";
+import { urlInformeMensal } from "../coleta/cvm/layout.ts";
+import {
+  confrontar,
+  confianca,
+  descrever,
+  valorUtilizavel,
+  type Concordancia,
+} from "./triangulacao.ts";
 
 export type EntradaPreRanking = {
   cotacoesPorTicker: Map<string, CotacaoBruta[]>;
   cadastro: readonly CadastroFundo[];
   complementos: readonly ComplementoMensal[];
   ativoPassivo?: readonly AtivoPassivoMensal[];
+  /** Informe trimestral: segunda medida de renda e sinais antes documentais. */
+  contratosTrimestrais?: readonly ContratosTrimestral[];
+  /** Concentração do maior inquilino, chaveada por `cnpj|dataReferencia`. */
+  concentracaoPorFundo?: ReadonlyMap<string, number>;
+  resultadosTrimestrais?: readonly ResultadoTrimestral[];
 };
 
 export type ItemPreRanking = {
@@ -58,6 +79,10 @@ export type ItemPreRanking = {
   decomposicao: Decomposicao | null;
   sinais: Sinal[];
   classificacao: Classificacao | null;
+  /** Confronto entre as fontes de renda. Null quando não houve o que confrontar. */
+  rendaConfrontada: Concordancia | null;
+  /** 0 a 1: quanto se pode apoiar na renda usada. Não é nota de investimento. */
+  confiancaRenda: number;
   /** Por que não está na lista principal. Null quando está. */
   motivoAcompanhamento: string | null;
 };
@@ -224,6 +249,8 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
       decomposicao: null,
       sinais: [],
       classificacao: null,
+      rendaConfrontada: null,
+      confiancaRenda: 0,
       motivoAcompanhamento: null,
     };
 
@@ -308,10 +335,66 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
     }
 
     const rendaInicial = rendaAnualizadaDaJanela(janelaInicial);
-    const rendaFinal = rendaAnualizadaDaJanela(janelaFinal);
+    const rendaMensalDerivada = rendaAnualizadaDaJanela(janelaFinal);
+
+    // A renda final é confrontada entre as fontes antes de entrar no cálculo.
+    // A do informe mensal é DERIVADA (dividend_yield × VP, com base do yield
+    // não documentada); a do trimestral é declarada. Divergirem significa que
+    // pelo menos uma está errada — e aí o número é suspenso, não escolhido.
+    const anoFim = fim.dataReferencia.slice(0, 4);
+    const trimestreDoFim = (e.resultadosTrimestrais ?? []).find(
+      (r) =>
+        r.cnpj === fim.cnpj &&
+        r.dataReferencia.slice(0, 4) === anoFim &&
+        r.dataReferencia >= fim.dataReferencia,
+    );
+    const rendaTrimestralAnual = trimestreDoFim
+      ? (() => {
+          const porCota = rendaTrimestralPorCota(trimestreDoFim, fim.cotasEmitidas);
+          return porCota === null ? null : porCota * 4; // trimestre -> ano
+        })()
+      : null;
+
+    const rendaConfrontada = confrontar([
+      ...(rendaMensalDerivada !== null
+        ? [
+            {
+              fonte: "cvm_mensal" as const,
+              valor: rendaMensalDerivada,
+              url: urlInformeMensal(Number(anoFim)),
+              natureza: "derivado" as const,
+            },
+          ]
+        : []),
+      ...(rendaTrimestralAnual !== null && rendaTrimestralAnual > 0
+        ? [
+            {
+              fonte: "cvm_trimestral" as const,
+              valor: rendaTrimestralAnual,
+              url: urlInformeTrimestral(Number(anoFim)),
+              natureza: "publicado" as const,
+            },
+          ]
+        : []),
+      // O FNET entra na verificação dos candidatos do topo, documento a
+      // documento — varrer o mercado inteiro por ele exigiria dezenas de
+      // milhares de requisições e não cabe numa passada do funil.
+    ]);
+
+    const rendaFinal = valorUtilizavel(rendaConfrontada);
+    const comRenda = {
+      ...comVp,
+      rendaConfrontada,
+      confiancaRenda: confianca(rendaConfrontada),
+    };
 
     if (rendaInicial === null || rendaFinal === null) {
-      paraAcompanhamento("renda anualizada indisponível em uma das pontas", comVp);
+      paraAcompanhamento(
+        rendaConfrontada.estado === "divergem"
+          ? `fontes de renda em conflito — ${descrever(rendaConfrontada)}`
+          : "renda anualizada indisponível em uma das pontas",
+        comRenda,
+      );
       continue;
     }
 
@@ -325,13 +408,34 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
     if (!decomposicao.ok) {
       paraAcompanhamento(
         `${decomposicao.motivo}: ${decomposicao.detalhe}`,
-        comVp,
+        comRenda,
       );
       continue;
     }
 
     const ap = apPorChave.get(`${fim.cnpj}|${fim.dataReferencia}`);
     const apAnterior = apPorChave.get(`${inicio.cnpj}|${inicio.dataReferencia}`);
+
+    // Do informe trimestral: contratos e concentração, que deixaram de ser
+    // documentais quando a fonte passou a existir.
+    const contratos = (e.contratosTrimestrais ?? [])
+      .filter((c) => c.cnpj === fim.cnpj)
+      .sort((a, b) => a.dataReferencia.localeCompare(b.dataReferencia))
+      .at(-1);
+
+    const concentracao = (() => {
+      if (!e.concentracaoPorFundo) return undefined;
+      let maisRecente: number | undefined;
+      let dataMaisRecente = "";
+      for (const [chave, valor] of e.concentracaoPorFundo) {
+        const [cnpj, data] = chave.split("|");
+        if (cnpj === fim.cnpj && data > dataMaisRecente) {
+          dataMaisRecente = data;
+          maisRecente = valor;
+        }
+      }
+      return maisRecente;
+    })();
 
     const sinais = avaliarSinais({
       alavancagemAtual: ap
@@ -340,10 +444,12 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
       alavancagemAnterior: apAnterior
         ? (alavancagem(apAnterior, inicio.patrimonioLiquido) ?? undefined)
         : undefined,
+      contratosVencendo24mPct: contratos?.vencendoAte24m ?? undefined,
+      concentracaoMaiorInquilinoPct: concentracao,
     });
 
     const item: ItemPreRanking = {
-      ...comVp,
+      ...comRenda,
       decomposicao: decomposicao.valor,
       sinais,
       classificacao: classificar(decomposicao.valor, sinais),

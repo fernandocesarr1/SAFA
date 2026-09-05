@@ -20,18 +20,38 @@ const QUEDA_POR_YIELD = {
   rendaFinal: 10,
 };
 
+/**
+ * Os três sinais que fonte numérica aberta fornece: alavancagem (informe
+ * mensal), contratos vencendo e concentração de inquilino (informe trimestral).
+ */
+const SINAIS_QUANTITATIVOS = {
+  alavancagemAtual: 0.1,
+  alavancagemAnterior: 0.1,
+  contratosVencendo24mPct: 0.15,
+  concentracaoMaiorInquilinoPct: 0.12,
+};
+
 test("cobertura mede só sinais quantitativos, senão o funil nunca produz candidato", () => {
-  // com a alavancagem conhecida, a cobertura quantitativa é total, ainda que
-  // os seis sinais documentais sigam desconhecidos
-  const sinais = avaliarSinais({ alavancagemAtual: 0.1, alavancagemAnterior: 0.1 });
+  const sinais = avaliarSinais(SINAIS_QUANTITATIVOS);
   const resumo = resumirSinais(sinais);
 
   assert.equal(resumo.cobertura, 1);
-  assert.equal(resumo.pendentesDocumentais.length, 6);
+  // os quatro que continuam exigindo leitura documental
+  assert.equal(resumo.pendentesDocumentais.length, 4);
 
   const d = decomporVariacao(QUEDA_POR_YIELD);
   assert.ok(d.ok);
   assert.equal(classificar(d.valor, sinais).classe, "candidato_desconto");
+});
+
+test("um quantitativo só não basta: cobertura parcial ainda é insuficiente", () => {
+  // com três sinais quantitativos possíveis, saber um deles dá 33%
+  const sinais = avaliarSinais({ alavancagemAtual: 0.1 });
+  assert.ok(Math.abs(resumirSinais(sinais).cobertura - 1 / 3) < 1e-9);
+
+  const d = decomporVariacao(QUEDA_POR_YIELD);
+  assert.ok(d.ok);
+  assert.equal(classificar(d.valor, sinais).classe, "dados_insuficientes");
 });
 
 test("sem nenhum sinal quantitativo, o desfecho continua sendo dados_insuficientes", () => {
@@ -42,7 +62,7 @@ test("sem nenhum sinal quantitativo, o desfecho continua sendo dados_insuficient
 });
 
 test("sinal documental desconhecido vira pendência, nunca aval de que está tudo bem", () => {
-  const sinais = avaliarSinais({ alavancagemAtual: 0.1 });
+  const sinais = avaliarSinais(SINAIS_QUANTITATIVOS);
   const d = decomporVariacao(QUEDA_POR_YIELD);
   assert.ok(d.ok);
   const c = classificar(d.valor, sinais);
@@ -51,7 +71,7 @@ test("sinal documental desconhecido vira pendência, nunca aval de que está tud
   // o candidato carrega as verificações que a triagem não pode fazer
   assert.ok(c.pendencias.some((p) => p.includes("vacância")));
   assert.ok(c.pendencias.some((p) => p.includes("inadimplência")));
-  assert.ok(c.pendencias.length >= 6);
+  assert.equal(c.pendencias.length, 4);
 });
 
 test("alavancagem alta ainda barra o candidato, mesmo com cobertura total", () => {
