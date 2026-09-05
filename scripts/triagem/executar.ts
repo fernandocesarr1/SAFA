@@ -22,10 +22,15 @@ import { montarPreRanking, resumir } from "../../lib/triagem/pre-ranking.ts";
 // Anos a considerar. Vários, porque desconto é distância do topo e o topo
 // costuma estar em outro ano-calendário: uma janela de 12 meses só enxerga o
 // saldo do período e daria como "estável" um fundo que despencou antes dela.
+// Quatro anos por padrão. A avaliação exata exige 36 meses de histórico, e
+// uma janela de três anos-calendário nunca os alcança: coletar 2024–2026 em
+// setembro de 2026 dá 33 meses, e a lista principal sairia vazia por
+// construção — não por falta de fundos maduros.
+const anoAtual = new Date().getUTCFullYear();
 const anos = (
   process.argv[2]
     ? process.argv.slice(2).map(Number)
-    : [new Date().getUTCFullYear() - 1, new Date().getUTCFullYear()]
+    : [anoAtual - 3, anoAtual - 2, anoAtual - 1, anoAtual]
 ).filter((a) => Number.isInteger(a) && a >= 2000);
 
 if (anos.length === 0) {
@@ -92,56 +97,85 @@ console.log(
 );
 
 console.log("\n[3/3] Cruzamento e decomposição...");
-const itens = montarPreRanking({
+const triagem = montarPreRanking({
   cotacoesPorTicker: porTicker(cotacoes),
   cadastro,
   complementos,
   ativoPassivo,
 });
-const resumo = resumir(itens);
 
-console.log(`      ${resumo.total} tickers processados · ${resumo.impedidos} sem dados suficientes`);
+const limite = Number(process.env.SAFA_TOP ?? 25);
+const topo = Number.isFinite(limite) ? limite : 25;
+const largura = { t: 8, s: 22 };
 
-// Por que os fundos ficaram de fora importa tanto quanto quem entrou: um
-// impedimento dominante costuma ser defeito de cruzamento, não falta de dado.
+function imprimirFila(titulo: string, itens: typeof triagem.principal): void {
+  const resumo = resumir(itens);
+  console.log(`\n${"=".repeat(78)}`);
+  console.log(`${titulo} — ${resumo.total} fundos`);
+  console.log("=".repeat(78));
+
+  for (const [classe, n] of Object.entries(resumo.porClasse).sort(
+    (a, b) => b[1] - a[1],
+  )) {
+    console.log(`  ${String(n).padStart(4)}  ${classe}`);
+  }
+
+  console.log(`\n  candidatos a desconto: ${resumo.candidatos.length}`);
+  if (resumo.candidatos.length === 0) return;
+
+  console.log(
+    `\n  ${"TICKER".padEnd(largura.t)} ${"SEGMENTO".padEnd(largura.s)} ${"PRIOR".padStart(7)} ${"QUEDA".padStart(7)} ${"P/VP".padStart(6)}  ${"MESES".padStart(5)}  OBSERVAÇÃO`,
+  );
+  for (const item of resumo.candidatos.slice(0, topo)) {
+    const queda = item.decomposicao
+      ? `${(Math.expm1(item.decomposicao.variacaoPreco) * 100).toFixed(1)}%`
+      : "—";
+    const meses = `${item.maturidade.mesesPreco}/${item.maturidade.mesesRendimento}`;
+    console.log(
+      `  ${item.ticker.padEnd(largura.t)} ${(item.segmento ?? "—").slice(0, largura.s).padEnd(largura.s)} ` +
+        `${(item.classificacao?.prioridade ?? 0).toFixed(2).padStart(7)} ${queda.padStart(7)} ` +
+        `${(item.precoSobreVp?.toFixed(2) ?? "—").padStart(6)}  ${meses.padStart(5)}  ` +
+        `${item.motivoAcompanhamento ?? item.classificacao?.justificativa ?? ""}`,
+    );
+  }
+}
+
+console.log(
+  `      ${triagem.principal.length} na principal · ${triagem.acompanhamento.length} em acompanhamento · ${triagem.excluidos.length} excluídos`,
+);
+
+imprimirFila("LISTA PRINCIPAL · histórico completo (36 meses de preço e rendimento)", triagem.principal);
+imprimirFila("LISTA DE ACOMPANHAMENTO · comprável e negociado, sem histórico exato", triagem.acompanhamento);
+
+// Motivos de acompanhamento agregados: um motivo dominante costuma ser defeito
+// de cruzamento, não falta de dado.
 const motivos = new Map<string, number>();
-for (const i of itens) {
-  if (!i.impedimento) continue;
-  const chave = i.impedimento
+for (const i of triagem.acompanhamento) {
+  if (!i.motivoAcompanhamento) continue;
+  const chave = i.motivoAcompanhamento
     .replace(/\d+/g, "N")
     .replace(/ISIN \S+/, "ISIN X");
   motivos.set(chave, (motivos.get(chave) ?? 0) + 1);
 }
 if (motivos.size > 0) {
-  console.log("\n=== motivos de exclusão ===");
+  console.log("\n=== por que estão em acompanhamento ===");
   for (const [motivo, n] of [...motivos.entries()].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${String(n).padStart(4)}  ${motivo}`);
   }
 }
 
-console.log("\n=== classificação ===");
-for (const [classe, n] of Object.entries(resumo.porClasse).sort((a, b) => b[1] - a[1])) {
-  console.log(`  ${String(n).padStart(4)}  ${classe}`);
+const porExclusao = new Map<string, number>();
+for (const x of triagem.excluidos) {
+  porExclusao.set(x.motivo, (porExclusao.get(x.motivo) ?? 0) + 1);
+}
+console.log("\n=== excluídos das listas ===");
+for (const [motivo, n] of [...porExclusao.entries()].sort((a, b) => b[1] - a[1])) {
+  console.log(`  ${String(n).padStart(4)}  ${motivo}`);
 }
 
-console.log(`\n=== fila do Deep Max — ${resumo.candidatos.length} candidatos ===`);
-const largura = { t: 8, s: 22 };
-console.log(
-  `  ${"TICKER".padEnd(largura.t)} ${"SEGMENTO".padEnd(largura.s)} ${"PRIOR".padStart(7)} ${"QUEDA".padStart(7)} ${"P/VP".padStart(6)}  JUSTIFICATIVA`,
-);
-const limite = Number(process.env.SAFA_TOP ?? 25);
-for (const item of resumo.candidatos.slice(0, Number.isFinite(limite) ? limite : 25)) {
-  const queda = item.decomposicao
-    ? `${(Math.expm1(item.decomposicao.variacaoPreco) * 100).toFixed(1)}%`
-    : "—";
-  console.log(
-    `  ${item.ticker.padEnd(largura.t)} ${(item.segmento ?? "—").slice(0, largura.s).padEnd(largura.s)} ` +
-      `${(item.classificacao?.prioridade ?? 0).toFixed(2).padStart(7)} ${queda.padStart(7)} ` +
-      `${(item.precoSobreVp?.toFixed(2) ?? "—").padStart(6)}  ${item.classificacao?.justificativa ?? ""}`,
-  );
-}
-
-const pendentes = resumo.candidatos.flatMap((c) => c.classificacao?.pendencias ?? []);
+const pendentes = [...triagem.principal, ...triagem.acompanhamento]
+  .filter((c) => c.classificacao?.classe === "candidato_desconto")
+  .flatMap((c) => c.classificacao?.pendencias ?? []);
 const contagem = new Map<string, number>();
 for (const p of pendentes) contagem.set(p, (contagem.get(p) ?? 0) + 1);
 if (contagem.size > 0) {

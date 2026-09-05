@@ -107,6 +107,31 @@ e não por inchaço. Um coletor novo (FNET, CVM) entra como pasta irmã de
 | D10 | ambiguidade resolvida por escrito: cap rate sobre renda real, sem termo de crescimento separado |
 | D14 | a triagem não usa Fibonacci, MACD nem RSI — usa preço, renda e liquidez |
 
+## Duas listas, e o que sai de vez
+
+Falta de dado nunca descarta um fundo. Só duas coisas tiram alguém das listas:
+
+| Sai | Por quê |
+|---|---|
+| público restrito | qualificado ou profissional — não é comprável por pessoa comum |
+| sem negociação | último pregão há mais de 90 dias do fim do período |
+
+Todo o resto entra, numa de duas filas:
+
+| Lista | Critério | Para que serve |
+|---|---|---|
+| **principal** | 36 meses de preço **e** 36 competências com rendimento | decomposição confiável, ordena o Deep Max |
+| **acompanhamento** | tudo o mais que é comprável e negocia | observar fundamentos e motivos; migra sozinho quando o histórico amadurece |
+
+O fundo em acompanhamento carrega o motivo de estar lá — quantos meses tem e
+quantos faltam. Um fundo novo não é pior: é apenas jovem, e a lista existe para
+que ele não seja esquecido até amadurecer.
+
+**A janela de coleta precisa exceder 36 meses.** Coletar três anos-calendário em
+setembro dá 33 meses e esvazia a lista principal por construção, não por falta
+de fundos maduros — foi o que aconteceu na primeira execução com a regra nova. O
+padrão passou a ser quatro anos.
+
 ## Primeira execução real (05/09/2026)
 
 Rodada sobre 2024–2026, com download de verdade:
