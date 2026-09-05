@@ -129,7 +129,8 @@ const largura = { t: 8, s: 22 };
 console.log(
   `  ${"TICKER".padEnd(largura.t)} ${"SEGMENTO".padEnd(largura.s)} ${"PRIOR".padStart(7)} ${"QUEDA".padStart(7)} ${"P/VP".padStart(6)}  JUSTIFICATIVA`,
 );
-for (const item of resumo.candidatos.slice(0, 25)) {
+const limite = Number(process.env.SAFA_TOP ?? 25);
+for (const item of resumo.candidatos.slice(0, Number.isFinite(limite) ? limite : 25)) {
   const queda = item.decomposicao
     ? `${(Math.expm1(item.decomposicao.variacaoPreco) * 100).toFixed(1)}%`
     : "—";
