@@ -5,6 +5,14 @@
 > vivia solto e não versionado na raiz do repositório; foi trazido para cá sob a
 > convenção de registro legado de `AGENTS.md` §15.
 >
+> Em 05/09/2026 esta passou a ser a **cópia única**. O Codex havia versionado o
+> mesmo conteúdo em `HANDOFF_CLAUDE_CODE.md`, na raiz (PR #2), sem que a sessão
+> de reconciliação soubesse. Os dois corpos foram comparados e são idênticos —
+> 10.421 caracteres, sha256 `23d15f83db5ca74c…` — de modo que a remoção daquele
+> arquivo não descartou conteúdo algum. Manter as duas cópias deixaria uma
+> delas sem as correções abaixo, que é como o erro do D6 se propagou da
+> primeira vez.
+>
 > Dois pontos do texto original **foram superados por verificação posterior** e
 > não devem ser lidos como estado atual:
 >
