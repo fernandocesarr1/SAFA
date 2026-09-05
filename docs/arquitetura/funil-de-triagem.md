@@ -194,11 +194,15 @@ A triagem diz onde olhar. Ela não diz o que concluir.
   para ordenar fila; não serve para veredito.
 - Não há coletor de proventos (FNET), que é o que traria o provento com fonte
   primária e resolveria o item acima.
-- 383 dos 551 fundos ficam de fora, a maioria por pouco histórico ou baixa
-  liquidez — o que é filtro proposital — mas 32 caem por ISIN sem
-  correspondência na CVM, e isso é defeito de cruzamento a investigar.
-- Os sinais quantitativos são um só (alavancagem). Cada novo sinal numérico
-  aumenta a força da triagem mais do que qualquer refinamento do score.
+- O cruzamento B3 ↔ CVM foi refeito em degraus e o resíduo caiu de 133 para
+  64 papéis; 44 dos que "faltavam" eram direitos de subscrição, que não são
+  fundo. Os 64 restantes não são defeito conhecido: são papéis que o Informe
+  Mensal de FII não cobre. Detalhe em `fontes-de-dados.md`.
+- **Vínculo `a_confirmar` não entra na lista principal.** Quando a identidade
+  do fundo repousa em heurística — prefixo de ISIN sem corroboração do nome, ou
+  casamento só por nome —, o fundo vai para acompanhamento com a pendência
+  nomeada. Fundamento de um fundo colado no preço de outro seria o pior defeito
+  possível nesta etapa.
 
 **A triagem não deve ser usada para decidir aporte.** Ela ordena investigação
 sobre dado derivado, e o D1 segue aberto para as séries que já estavam no banco.

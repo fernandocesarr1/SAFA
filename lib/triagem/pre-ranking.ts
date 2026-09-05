@@ -49,6 +49,13 @@ import {
   valorUtilizavel,
   type Concordancia,
 } from "./triangulacao.ts";
+import {
+  classificarPapel,
+  montarIndiceCadastro,
+  vincular,
+  type ConfiancaVinculo,
+  type MetodoVinculo,
+} from "./vinculo.ts";
 
 export type EntradaPreRanking = {
   cotacoesPorTicker: Map<string, CotacaoBruta[]>;
@@ -79,6 +86,10 @@ export type ItemPreRanking = {
   decomposicao: Decomposicao | null;
   sinais: Sinal[];
   classificacao: Classificacao | null;
+  /** Como o papel foi ligado ao fundo da CVM. Null quando não foi. */
+  metodoVinculo: MetodoVinculo | null;
+  /** Se o vínculo se sustenta em chave ou em heurística. */
+  confiancaVinculo: ConfiancaVinculo | null;
   /** Confronto entre as fontes de renda. Null quando não houve o que confrontar. */
   rendaConfrontada: Concordancia | null;
   /** 0 a 1: quanto se pode apoiar na renda usada. Não é nota de investimento. */
@@ -115,23 +126,6 @@ export const PADROES = {
 
 /** Meses usados em cada ponta da janela de renda. */
 export const MESES_JANELA_RENDA = 3;
-
-function normalizarIsin(isin: string): string {
-  return isin.trim().toUpperCase();
-}
-
-function indexarCadastroPorIsin(
-  cadastro: readonly CadastroFundo[],
-): Map<string, CadastroFundo> {
-  const mapa = new Map<string, CadastroFundo>();
-  for (const c of cadastro) {
-    if (!c.isin) continue;
-    const chave = normalizarIsin(c.isin);
-    const atual = mapa.get(chave);
-    if (!atual || c.dataReferencia > atual.dataReferencia) mapa.set(chave, c);
-  }
-  return mapa;
-}
 
 function indexarComplementos(
   complementos: readonly ComplementoMensal[],
@@ -180,7 +174,7 @@ function mesesDistintos(serie: readonly CotacaoBruta[]): number {
 }
 
 export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
-  const porIsin = indexarCadastroPorIsin(e.cadastro);
+  const indiceCadastro = montarIndiceCadastro(e.cadastro);
   const porCnpj = indexarComplementos(e.complementos);
 
   const apPorChave = new Map<string, AtivoPassivoMensal>();
@@ -204,7 +198,28 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
 
     const primeira = serie[0];
     const ultima = serie[serie.length - 1];
-    const cadastro = porIsin.get(normalizarIsin(ultima.codigoIsin)) ?? null;
+
+    // Todos os ISINs vistos, não só o da última cotação: o papel pode ter
+    // trocado de código no meio da série.
+    const isins = [...new Set(serie.map((c) => c.codigoIsin).filter((i) => i !== ""))];
+
+    // Direito de subscrição e recibo não são fundo. Saem antes de qualquer
+    // tentativa de cruzamento, porque cadastro de fundo eles não têm mesmo.
+    if (classificarPapel(isins) === "direito") {
+      excluidos.push({
+        ticker,
+        nome: null,
+        motivo: "nao_e_cota",
+        detalhe: `ISIN ${isins[0] ?? "(vazio)"}: direito de subscrição ou recibo, não cota`,
+      });
+      continue;
+    }
+
+    const vinculo = vincular(indiceCadastro, {
+      isins,
+      nomeResumido: ultima.nomeResumido,
+    });
+    const cadastro = vinculo.vinculado ? vinculo.cadastro : null;
 
     const elegibilidade = avaliarElegibilidade({
       cadastro,
@@ -249,6 +264,8 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
       decomposicao: null,
       sinais: [],
       classificacao: null,
+      metodoVinculo: vinculo.vinculado ? vinculo.metodo : null,
+      confiancaVinculo: vinculo.vinculado ? vinculo.confianca : null,
       rendaConfrontada: null,
       confiancaRenda: 0,
       motivoAcompanhamento: null,
@@ -258,9 +275,17 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
       acompanhamento.push({ ...base, ...extra, motivoAcompanhamento: motivo });
     };
 
-    if (!cadastro) {
+    if (!vinculo.vinculado) {
+      paraAcompanhamento(vinculo.motivo);
+      continue;
+    }
+
+    // Vínculo que repousa em heurística não sustenta lista principal: o
+    // fundamento pode ser de outro fundo. Vai para acompanhamento com a
+    // pendência nomeada, em vez de virar candidato com identidade suposta.
+    if (vinculo.confianca === "a_confirmar") {
       paraAcompanhamento(
-        `ISIN ${normalizarIsin(ultima.codigoIsin) || "(vazio)"} sem correspondência no cadastro da CVM`,
+        `identidade a confirmar — ${vinculo.nota ?? "vínculo por heurística"}`,
       );
       continue;
     }

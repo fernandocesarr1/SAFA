@@ -20,7 +20,16 @@ import type { CadastroFundo } from "../coleta/cvm/parser.ts";
 /** O único público-alvo que uma pessoa comum acessa, conforme a CVM. */
 export const PUBLICO_ALVO_GERAL = "INVESTIDORES EM GERAL";
 
-export type MotivoExclusao = "publico_restrito" | "sem_negociacao";
+/**
+ * Por que o papel saiu de todas as listas.
+ *
+ * `nao_e_cota` — o papel é direito de subscrição ou recibo, não cota. A B3
+ * publica os três sob o mesmo código BDI 12, e só o ISIN os separa. Sem esta
+ * distinção, 44 papéis apareciam como "fundo sem cadastro na CVM": falta de
+ * cadastro que era, na verdade, erro de classificação — não existe cadastro de
+ * fundo para um direito porque um direito não é um fundo.
+ */
+export type MotivoExclusao = "publico_restrito" | "sem_negociacao" | "nao_e_cota";
 
 export type Elegibilidade =
   | { elegivel: true }

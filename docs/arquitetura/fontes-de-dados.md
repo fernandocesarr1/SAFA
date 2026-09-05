@@ -50,6 +50,50 @@ isso** — o número é internamente coerente e só denuncia contra outra medida
 
 Depois da correção, as concordâncias subiram de 96 para 163.
 
+## O ISIN não é chave confiável entre B3 e CVM
+
+Este era o defeito por trás dos "fundos sem correspondência no cadastro". A
+medição sobre 594 papéis mostrou que não era um problema, eram três:
+
+| | papéis | o que é |
+|---|---|---|
+| direito de subscrição ou recibo | 44 | não é fundo; a B3 publica sob o mesmo BDI 12 da cota |
+| mesmo fundo, outro sufixo de ISIN | 20 | o sufixo numera a emissão, o prefixo identifica o emissor |
+| ISIN divergente entre as fontes | 6 recuperados | o fundo trocou de mnemônico |
+
+O terceiro é o mais instrutivo. O **BTCI11** negocia como `BRBTCICTF005` e está
+no informe da CVM como `BRFEXCCTF007` — `FEXC11` era o ticker anterior. **A B3
+passa a publicar o ISIN do mnemônico novo; a CVM mantém o do registro
+original.** O identificador que deveria ser global diverge entre as duas
+fontes, e diverge exatamente para os fundos que mudaram de nome.
+
+O vínculo passou a ser tentado em degraus — ISIN exato, prefixo de ISIN, nome
+resumido — e **o degrau usado fica registrado**, porque casar por nome não vale
+o mesmo que casar por ISIN.
+
+Nenhum degrau desempata. Havendo mais de um candidato, o vínculo falha
+declarando a ambiguidade: colar o fundamento de um fundo no preço de outro é o
+pior defeito possível nesta etapa.
+
+### Vínculo provável não é vínculo confirmado
+
+A medição produziu casos que não se resolvem com mais algoritmo:
+
+```
+FATN11  "FII ATHENA I"  ->  BRC RENDA CORPORATIVA FII
+ASMT11  "FII ASA MET"   ->  DAYCOVAL RE MULTIESTRATÉGIA
+```
+
+O prefixo do ISIN diz que é o mesmo fundo; o nome diz que não. Pode ser troca
+de gestor, pode ser mnemônico reaproveitado pela B3. **Escolher um dos dois
+seria fabricar certeza.**
+
+Por isso o vínculo carrega confiança além do método: `confirmado` quando o ISIN
+bate exato ou quando duas chaves independentes concordam; `a_confirmar` quando
+repousa em heurística. **Fundo `a_confirmar` não entra na lista principal** —
+vai para acompanhamento com a pendência nomeada, para o Deep Max confirmar a
+identidade antes de qualquer conclusão sobre o fundo.
+
 ## Por que o FNET importa
 
 A renda da triagem vinha de `dividend_yield_mes × valor_patrimonial_cota`, do
@@ -82,5 +126,7 @@ concentração medida, 1.464 com rendimento declarado.
 - O FNET responde documento a documento, então montar série histórica exige
   muitas requisições — é coleta incremental, não varredura de uma vez.
 - O informe trimestral tem defasagem maior que o mensal.
-- Nada disso está integrado ao pré-ranking ainda: a triangulação existe e é
-  testada, mas o funil continua consumindo só o informe mensal.
+- O casamento por nome resumido é heurístico: a B3 dá 12 posições e come
+  vogais. Serve para propor o vínculo, nunca para confirmá-lo.
+- Falta uma fonte que publique **ticker ↔ CNPJ** diretamente. Ela tornaria todo
+  o degrau heurístico desnecessário, e é o caminho certo quando aparecer.

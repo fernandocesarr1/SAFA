@@ -22,13 +22,19 @@ import {
 } from "./layout.ts";
 
 /** Versão do parser. Sobe quando a interpretação do arquivo muda. */
-export const VERSAO_PARSER = "cotahist-1.0.0";
+export const VERSAO_PARSER = "cotahist-1.1.0";
 
 export type CotacaoBruta = {
   /** AAAA-MM-DD */
   dataPregao: string;
   ticker: string;
   codigoIsin: string;
+  /**
+   * Nome resumido do papel na B3, 12 posições. É a única identificação
+   * textual do arquivo, e serve de chave de reserva quando o ISIN da B3 e o
+   * da CVM divergem — o que acontece sempre que o fundo troca de mnemônico.
+   */
+  nomeResumido: string;
   precoAbertura: number;
   precoMaximo: number;
   precoMinimo: number;
@@ -163,6 +169,7 @@ function interpretarLinha(
       dataPregao,
       ticker,
       codigoIsin: fatia(linha, "codigoIsin").trim(),
+      nomeResumido: fatia(linha, "nomeResumido").trim(),
       precoAbertura: precoAbertura!,
       precoMaximo: precoMaximo!,
       precoMinimo: precoMinimo!,

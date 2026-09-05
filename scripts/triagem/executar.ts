@@ -49,7 +49,7 @@ if (anos.length === 0) {
 
 console.log(`SAFA — triagem do universo de FIIs, anos ${anos.join(", ")}\n`);
 
-console.log("[1/3] COTAHIST da B3...");
+console.log("[1/4] COTAHIST da B3...");
 const cotacoes = [];
 const universo = new Set<string>();
 for (const ano of anos) {
@@ -78,7 +78,7 @@ if (cotacoes.length === 0) {
 }
 console.log(`      total: ${cotacoes.length} cotações · ${universo.size} FIIs`);
 
-console.log("\n[2/3] Informe Mensal da CVM...");
+console.log("\n[2/4] Informe Mensal da CVM...");
 const cadastro = [];
 const complementos = [];
 const ativoPassivo = [];
