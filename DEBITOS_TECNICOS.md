@@ -214,6 +214,47 @@ desativado. Não rodar `drizzle-kit`. Avaliar remoção.
 
 ---
 
+## Trabalho preparado e ainda NÃO integrado
+
+Adicionado em 05/09/2026. **Nenhum item abaixo resolve dívida ainda**: o código
+existe, tem teste e não está ligado ao app nem ao banco. Registrado aqui para
+não parecer feito.
+
+### O achado que motivou
+
+A arquitetura não alcança o objetivo declarado do SAFA — varrer o mercado de
+FIIs — e o motivo é aritmético, não de esforço. O Deep Max exige 16 seções, 100
+critérios e leitura documental integral em duas passagens por fundo. Saíram duas
+análises em dois dias; o mercado tem centenas de fundos. Nenhum ganho de
+produtividade fecha essa conta.
+
+A correção é separar varredura de análise profunda, em funil de quatro
+estágios, com triagem quantitativa automática antes do Deep Max. Desenho em
+`docs/arquitetura/funil-de-triagem.md`.
+
+### O que já existe
+
+| Módulo | Ataca | Estado |
+|---|---|---|
+| `lib/coleta/cotahist/` | D1 | parser do registro de 245 posições, com rejeição explícita e precisão de 2 casas. **Falta o download e a descompactação.** |
+| `lib/coleta/lote.ts` | D1, D3, D12 | linhagem obrigatória: URL que identifique o arquivo, hash, versão do parser, contagem |
+| `lib/triagem/` | escalabilidade, D4 | decomposição `ln(P1/P0) = ln(R1/R0) − ln(Y1/Y0)` e sinais de deterioração com estado `desconhecido` |
+| `lib/metodologia/yield-exigido.ts` | D9, D10 | NTN-B + prêmio + ajustes, cada linha com fonte; cap rate sobre renda real declarado por escrito |
+| `supabase/propostas/` | D1, D4 | SQL de lotes e triagem, **não aplicado** |
+
+32 testes de comportamento passando (`npm run test:unit`).
+
+### O que impede de valer
+
+1. **Nada está integrado.** O app não lê nada disso; o banco não tem as tabelas.
+2. **Falta o coletor de proventos (FNET).** Sem ele, a renda usada na
+   decomposição continua vindo dos dados que o D1 manda rejeitar.
+3. **A triagem não roda sozinha** — falta o orquestrador que percorre o universo.
+4. **Rodar a triagem sobre os dados atuais herdaria o D1** e daria aparência
+   quantitativa a dado sem procedência, que é pior do que não ter triagem.
+
+---
+
 ## Ordem de execução acordada
 
 1. Revisar e aprovar os arquivos de governança.
