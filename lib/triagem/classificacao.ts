@@ -96,8 +96,8 @@ export function classificar(
       prioridade: 0,
       justificativa:
         `queda de ${quedaPct.toFixed(1)}% puxada por yield, mas só ` +
-        `${(resumo.cobertura * 100).toFixed(0)}% dos sinais puderam ser avaliados; ` +
-        "ausência de sinal aqui não é ausência de problema",
+        `${(resumo.cobertura * 100).toFixed(0)}% dos sinais quantitativos puderam ` +
+        "ser avaliados; ausência de sinal aqui não é ausência de problema",
       pendencias,
     };
   }
@@ -114,8 +114,9 @@ export function classificar(
     prioridade,
     justificativa:
       `queda de ${quedaPct.toFixed(1)}% com renda de pé — ` +
-      `${(fracaoYield * 100).toFixed(0)}% da queda veio de yield exigido, ` +
-      `sem sinal de deterioração em ${(resumo.cobertura * 100).toFixed(0)}% dos itens avaliados`,
+      `${(fracaoYield * 100).toFixed(0)}% veio de yield exigido; ` +
+      `nenhum sinal quantitativo de deterioração, e ` +
+      `${resumo.pendentesDocumentais.length} verificações documentais em aberto`,
     pendencias,
   };
 }

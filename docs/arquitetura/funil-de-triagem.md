@@ -107,15 +107,73 @@ e não por inchaço. Um coletor novo (FNET, CVM) entra como pasta irmã de
 | D10 | ambiguidade resolvida por escrito: cap rate sobre renda real, sem termo de crescimento separado |
 | D14 | a triagem não usa Fibonacci, MACD nem RSI — usa preço, renda e liquidez |
 
+## Primeira execução real (05/09/2026)
+
+Rodada sobre 2024–2026, com download de verdade:
+
+```
+node --max-old-space-size=6144 scripts/triagem/executar.ts 2024 2025 2026
+```
+
+| | |
+|---|---|
+| cotações COTAHIST | 196.765 |
+| FIIs no universo | **551** |
+| tickers processados | 551 |
+| sem dados suficientes | 383 |
+| queda com fundamento | 78 |
+| **candidatos a desconto** | **67** |
+| sem queda | 23 |
+
+Para efeito de comparação: o SAFA tinha 22 fundos cadastrados e 2 analisados.
+
+### Três defeitos que só a execução revelou
+
+**1. O ano-calendário mede o ano, não o desconto.** A primeira versão comparava
+o primeiro com o último pregão da janela. Um fundo que despencou em 2024 e ficou
+de lado em 2025 aparecia como estável. A referência passou a ser o **pico**: a
+pergunta certa é a distância do topo, não o saldo do período.
+
+**2. Renda de um mês é ruído.** Comparar o rendimento de uma competência com o
+de outra transforma mês atípico em "mudança de fundamento". Passou a usar a
+mediana de três competências em cada ponta.
+
+**3. Exigir cobertura de sinais documentais travava o funil inteiro.** Dos sete
+sinais, só a alavancagem vem de fonte numérica aberta; a cobertura ficava em 14%
+e **todos os 68 candidatos caíam em `dados_insuficientes`**. A correção não foi
+baixar o limiar — foi separar `quantitativo` de `documental`. A cobertura mede
+só o primeiro; o segundo vira pendência obrigatória do Deep Max.
+
+Além disso, um fundo apareceu no topo da fila com **P/VP de 18,55** — preço a
+dezoito vezes o patrimônio. Não é desconto, é divergência de cota ou unidade
+entre B3 e CVM. P/VP fora de `[0,05 · 3]` agora exclui a MEDIÇÃO, dizendo isso
+no impedimento.
+
+### O que a fila NÃO significa
+
+Estar no topo não é recomendação. `HCTR11` e `VSLH11` aparecem com P/VP de 0,14
+e "renda de pé" — são casos conhecidos de deterioração severa, e a renda
+derivada do informe da CVM provavelmente não capturou o colapso das
+distribuições. **São falsos positivos prováveis**, e é exatamente para isso que
+existem as seis verificações documentais pendentes em cada candidato.
+
+A triagem diz onde olhar. Ela não diz o que concluir.
+
 ## O que ainda não está feito
 
-- Nada disto está integrado ao app nem ao banco: as tabelas são proposta.
-- Não há coletor de proventos (FNET); sem ele a renda da decomposição ainda
-  depende dos dados atuais, que o D1 manda rejeitar.
-- O download e a descompactação do COTAHIST não estão implementados — só o
-  parser, que é a parte que precisa ser fiel ao byte.
-- A triagem não roda sozinha: falta o orquestrador que percorre o universo.
+- Nada disto está integrado ao app nem ao banco: as tabelas continuam proposta,
+  e o resultado da triagem só existe na saída do script.
+- **A renda é derivada, não publicada.** Vem de `dividend_yield_mes ×
+  valor_patrimonial_cota` do informe da CVM, porque a CVM não publica o valor
+  distribuído por cota. A base do yield não está documentada no leiaute. Serve
+  para ordenar fila; não serve para veredito.
+- Não há coletor de proventos (FNET), que é o que traria o provento com fonte
+  primária e resolveria o item acima.
+- 383 dos 551 fundos ficam de fora, a maioria por pouco histórico ou baixa
+  liquidez — o que é filtro proposital — mas 32 caem por ISIN sem
+  correspondência na CVM, e isso é defeito de cruzamento a investigar.
+- Os sinais quantitativos são um só (alavancagem). Cada novo sinal numérico
+  aumenta a força da triagem mais do que qualquer refinamento do score.
 
-**Enquanto a coleta não substituir as séries rejeitadas, a triagem não deve ser
-usada para decidir aporte.** Ela herdaria o D1 e daria aparência quantitativa a
-um dado sem procedência — que é pior do que não ter triagem.
+**A triagem não deve ser usada para decidir aporte.** Ela ordena investigação
+sobre dado derivado, e o D1 segue aberto para as séries que já estavam no banco.

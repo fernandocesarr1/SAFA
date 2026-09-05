@@ -14,9 +14,24 @@
 
 export type EstadoSinal = "ausente" | "presente" | "desconhecido";
 
+/**
+ * De onde o sinal pode vir.
+ *
+ * A distinção não é burocrática: exigir da triagem um sinal que só a leitura
+ * documental produz trava o funil inteiro. Vacância por ativo, inadimplência e
+ * cronograma de contratos moram em relatório gerencial — nenhuma fonte
+ * numérica aberta os publica de forma comparável entre fundos.
+ *
+ * - `quantitativo`: obtível por coleta automática. Entra na cobertura.
+ * - `documental`: só o Deep Max resolve. Quando desconhecido, vira PENDÊNCIA
+ *   obrigatória do candidato, nunca aval de que está tudo bem.
+ */
+export type OrigemSinal = "quantitativo" | "documental";
+
 export type Sinal = {
   codigo: string;
   rotulo: string;
+  origem: OrigemSinal;
   estado: EstadoSinal;
   /** Só preenchido quando `presente`: o que foi observado. */
   observado: string | null;
@@ -59,14 +74,16 @@ export const LIMIARES = {
 function sinal(
   codigo: string,
   rotulo: string,
+  origem: OrigemSinal,
   avaliacao: { presente: boolean; observado: string } | null,
 ): Sinal {
   if (avaliacao === null) {
-    return { codigo, rotulo, estado: "desconhecido", observado: null };
+    return { codigo, rotulo, origem, estado: "desconhecido", observado: null };
   }
   return {
     codigo,
     rotulo,
+    origem,
     estado: avaliacao.presente ? "presente" : "ausente",
     observado: avaliacao.presente ? avaliacao.observado : null,
   };
@@ -81,6 +98,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "vacancia_subindo",
       "Vacância física em alta",
+      "documental",
       e.vacanciaFisicaAtual !== undefined && e.vacanciaFisicaAnterior !== undefined
         ? {
             presente:
@@ -97,6 +115,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "inadimplencia",
       "Inadimplência relevante",
+      "documental",
       e.inadimplenciaPct !== undefined
         ? {
             presente: e.inadimplenciaPct >= LIMIARES.inadimplenciaCritica,
@@ -110,6 +129,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "alavancagem_subindo",
       "Alavancagem em alta ou elevada",
+      "quantitativo",
       e.alavancagemAtual !== undefined
         ? {
             presente:
@@ -129,6 +149,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "vencimento_divida",
       "Dívida concentrada em 12 meses",
+      "documental",
       e.dividaVencendo12mPct !== undefined
         ? {
             presente: e.dividaVencendo12mPct >= LIMIARES.dividaVencendo12mCritica,
@@ -142,6 +163,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "emissao_diluidora",
       "Emissão abaixo do valor patrimonial",
+      "documental",
       e.emissaoPrecoSobreVp !== undefined
         ? {
             presente: e.emissaoPrecoSobreVp < LIMIARES.emissaoDiluidoraVp,
@@ -155,6 +177,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "concentracao_inquilino",
       "Concentração em um inquilino",
+      "documental",
       e.concentracaoMaiorInquilinoPct !== undefined
         ? {
             presente: e.concentracaoMaiorInquilinoPct >= LIMIARES.concentracaoCritica,
@@ -168,6 +191,7 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
     sinal(
       "muro_vencimentos",
       "Contratos vencendo em 24 meses",
+      "documental",
       e.contratosVencendo24mPct !== undefined
         ? {
             presente: e.contratosVencendo24mPct >= LIMIARES.contratosVencendo24mCritica,
@@ -183,17 +207,39 @@ export function avaliarSinais(e: EntradaDeterioracao): Sinal[] {
 export type ResumoDeterioracao = {
   presentes: Sinal[];
   desconhecidos: Sinal[];
-  /** Sinais avaliados sobre o total possível — a cobertura da avaliação. */
+  /**
+   * Fração dos sinais QUANTITATIVOS que pôde ser avaliada.
+   *
+   * Só os quantitativos entram: cobrar da triagem um sinal que exige relatório
+   * gerencial condenaria todo fundo a `dados_insuficientes` e tornaria o funil
+   * inútil — foi o que aconteceu na primeira execução real, com 68 fundos
+   * travados aí.
+   */
   cobertura: number;
+  /**
+   * Sinais documentais não avaliados. Não reduzem a cobertura, mas o candidato
+   * carrega cada um como verificação obrigatória do Deep Max. Isto é o que
+   * impede a triagem de virar "não vi problema, logo não há".
+   */
+  pendentesDocumentais: Sinal[];
 };
 
 export function resumirSinais(sinais: Sinal[]): ResumoDeterioracao {
   const presentes = sinais.filter((s) => s.estado === "presente");
   const desconhecidos = sinais.filter((s) => s.estado === "desconhecido");
-  const avaliados = sinais.length - desconhecidos.length;
+
+  const quantitativos = sinais.filter((s) => s.origem === "quantitativo");
+  const quantitativosAvaliados = quantitativos.filter(
+    (s) => s.estado !== "desconhecido",
+  );
+
   return {
     presentes,
     desconhecidos,
-    cobertura: sinais.length === 0 ? 0 : avaliados / sinais.length,
+    cobertura:
+      quantitativos.length === 0
+        ? 0
+        : quantitativosAvaliados.length / quantitativos.length,
+    pendentesDocumentais: desconhecidos.filter((s) => s.origem === "documental"),
   };
 }
