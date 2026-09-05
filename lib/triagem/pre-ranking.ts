@@ -23,7 +23,8 @@ import type {
   CadastroFundo,
   ComplementoMensal,
 } from "../coleta/cvm/parser.ts";
-import { alavancagem, rendaMensalPorCota } from "../coleta/cvm/parser.ts";
+import { alavancagem } from "../coleta/cvm/parser.ts";
+import { rendaAnualizadaDaJanela, rendaTrimestralAnualizada } from "./renda.ts";
 import { classificar, type Classificacao } from "./classificacao.ts";
 import { decomporVariacao, type Decomposicao } from "./decomposicao.ts";
 import { avaliarSinais, type Sinal } from "./deterioracao.ts";
@@ -37,10 +38,7 @@ import type {
   ContratosTrimestral,
   ResultadoTrimestral,
 } from "../coleta/cvm/trimestral.ts";
-import {
-  rendaTrimestralPorCota,
-  urlInformeTrimestral,
-} from "../coleta/cvm/trimestral.ts";
+import { urlInformeTrimestral } from "../coleta/cvm/trimestral.ts";
 import { urlInformeMensal } from "../coleta/cvm/layout.ts";
 import {
   confrontar,
@@ -90,6 +88,8 @@ export type ItemPreRanking = {
   metodoVinculo: MetodoVinculo | null;
   /** Se o vínculo se sustenta em chave ou em heurística. */
   confiancaVinculo: ConfiancaVinculo | null;
+  /** De qual informe vieram AS DUAS pontas da renda. Null quando não houve. */
+  baseRenda: "cvm_mensal" | "cvm_trimestral" | null;
   /** Confronto entre as fontes de renda. Null quando não houve o que confrontar. */
   rendaConfrontada: Concordancia | null;
   /** 0 a 1: quanto se pode apoiar na renda usada. Não é nota de investimento. */
@@ -150,25 +150,6 @@ function indexarComplementos(
  * mensal em "mudança de fundamento", que é o erro que a decomposição existe
  * para evitar. A mediana resiste a um mês fora da curva sem descartá-lo.
  */
-function rendaAnualizadaDaJanela(
-  competencias: readonly ComplementoMensal[],
-): number | null {
-  const mensais = competencias
-    .map((c) => rendaMensalPorCota(c))
-    .filter((v): v is number => v !== null && v > 0)
-    .sort((a, b) => a - b);
-
-  if (mensais.length === 0) return null;
-
-  const meio = Math.floor(mensais.length / 2);
-  const mediana =
-    mensais.length % 2 === 0
-      ? (mensais[meio - 1] + mensais[meio]) / 2
-      : mensais[meio];
-
-  return mediana * 12;
-}
-
 function mesesDistintos(serie: readonly CotacaoBruta[]): number {
   return new Set(serie.map((c) => c.dataPregao.slice(0, 7))).size;
 }
@@ -266,6 +247,7 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
       classificacao: null,
       metodoVinculo: vinculo.vinculado ? vinculo.metodo : null,
       confiancaVinculo: vinculo.vinculado ? vinculo.confianca : null,
+      baseRenda: null,
       rendaConfrontada: null,
       confiancaRenda: 0,
       motivoAcompanhamento: null,
@@ -359,27 +341,53 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
       continue;
     }
 
-    const rendaInicial = rendaAnualizadaDaJanela(janelaInicial);
-    const rendaMensalDerivada = rendaAnualizadaDaJanela(janelaFinal);
+    const janelaRendaInicial = rendaAnualizadaDaJanela(janelaInicial);
+    const janelaRendaFinal = rendaAnualizadaDaJanela(janelaFinal);
+    const rendaMensalDerivada = janelaRendaFinal.ok ? janelaRendaFinal.valor : null;
 
-    // A renda final é confrontada entre as fontes antes de entrar no cálculo.
-    // A do informe mensal é DERIVADA (dividend_yield × VP, com base do yield
-    // não documentada); a do trimestral é declarada. Divergirem significa que
-    // pelo menos uma está errada — e aí o número é suspenso, não escolhido.
+    // Renda pelo informe TRIMESTRAL, nas duas pontas. O yield mensal traz zero
+    // em 49,3% das competências, e 345 fundos que nunca publicaram yield
+    // positivo declaram rendimento no trimestral — zero ali é, com frequência,
+    // campo não preenchido. Sem esta segunda medida, meio mercado sai da fila
+    // por um branco lido como ausência de renda.
     const anoFim = fim.dataReferencia.slice(0, 4);
-    const trimestreDoFim = (e.resultadosTrimestrais ?? []).find(
-      (r) =>
-        r.cnpj === fim.cnpj &&
-        r.dataReferencia.slice(0, 4) === anoFim &&
-        r.dataReferencia >= fim.dataReferencia,
+    const trimestralInicial = rendaTrimestralAnualizada(
+      e.resultadosTrimestrais ?? [],
+      inicio.cnpj,
+      inicio.dataReferencia,
+      inicio.cotasEmitidas,
     );
-    const rendaTrimestralAnual = trimestreDoFim
-      ? (() => {
-          const porCota = rendaTrimestralPorCota(trimestreDoFim, fim.cotasEmitidas);
-          return porCota === null ? null : porCota * 4; // trimestre -> ano
-        })()
-      : null;
+    const trimestralFinal = rendaTrimestralAnualizada(
+      e.resultadosTrimestrais ?? [],
+      fim.cnpj,
+      fim.dataReferencia,
+      fim.cotasEmitidas,
+    );
 
+    // As duas pontas têm de vir da MESMA base. O mensal é derivado
+    // (dividend_yield × VP) e o trimestral é declarado; medir a ponta inicial
+    // por um e a final por outro faria a diferença sistemática entre as bases
+    // aparecer como variação de renda que não houve — e a decomposição
+    // atribuiria a queda ao lugar errado.
+    const mensalNasDuas = janelaRendaInicial.ok && janelaRendaFinal.ok;
+    const trimestralNasDuas = trimestralInicial !== null && trimestralFinal !== null;
+
+    const baseRenda: "cvm_mensal" | "cvm_trimestral" | null = mensalNasDuas
+      ? "cvm_mensal"
+      : trimestralNasDuas
+        ? "cvm_trimestral"
+        : null;
+
+    const rendaInicial =
+      baseRenda === "cvm_mensal"
+        ? (janelaRendaInicial.ok ? janelaRendaInicial.valor : null)
+        : baseRenda === "cvm_trimestral"
+          ? trimestralInicial
+          : null;
+
+    // A ponta final é confrontada entre as duas fontes quando ambas existem:
+    // divergirem significa que pelo menos uma está errada, e aí o número é
+    // suspenso, não escolhido.
     const rendaConfrontada = confrontar([
       ...(rendaMensalDerivada !== null
         ? [
@@ -391,11 +399,11 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
             },
           ]
         : []),
-      ...(rendaTrimestralAnual !== null && rendaTrimestralAnual > 0
+      ...(trimestralFinal !== null
         ? [
             {
               fonte: "cvm_trimestral" as const,
-              valor: rendaTrimestralAnual,
+              valor: trimestralFinal,
               url: urlInformeTrimestral(Number(anoFim)),
               natureza: "publicado" as const,
             },
@@ -406,18 +414,38 @@ export function montarPreRanking(e: EntradaPreRanking): ResultadoTriagem {
       // milhares de requisições e não cabe numa passada do funil.
     ]);
 
-    const rendaFinal = valorUtilizavel(rendaConfrontada);
+    // Confronto divergente suspende o número mesmo quando há base única.
+    const rendaFinal =
+      rendaConfrontada.estado === "divergem"
+        ? null
+        : baseRenda === "cvm_mensal"
+          ? (valorUtilizavel(rendaConfrontada) ?? rendaMensalDerivada)
+          : baseRenda === "cvm_trimestral"
+            ? trimestralFinal
+            : null;
+
     const comRenda = {
       ...comVp,
       rendaConfrontada,
       confiancaRenda: confianca(rendaConfrontada),
+      baseRenda,
     };
 
     if (rendaInicial === null || rendaFinal === null) {
+      // Qual ponta falhou e por quê. "Renda indisponível" sem mais nada não
+      // permite separar dado que a CVM não publica de fundo que não distribuiu.
+      const pontas: string[] = [];
+      if (!janelaRendaInicial.ok) {
+        pontas.push(`janela do pico: ${janelaRendaInicial.motivo}`);
+      }
+      if (rendaFinal === null && !janelaRendaFinal.ok) {
+        pontas.push(`janela final: ${janelaRendaFinal.motivo}`);
+      }
+
       paraAcompanhamento(
         rendaConfrontada.estado === "divergem"
           ? `fontes de renda em conflito — ${descrever(rendaConfrontada)}`
-          : "renda anualizada indisponível em uma das pontas",
+          : `renda anualizada indisponível — ${pontas.join("; ") || "sem fonte utilizável"}`,
         comRenda,
       );
       continue;

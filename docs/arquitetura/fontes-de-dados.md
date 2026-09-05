@@ -50,6 +50,70 @@ isso** — o número é internamente coerente e só denuncia contra outra medida
 
 Depois da correção, as concordâncias subiram de 96 para 163.
 
+## O yield mensal da CVM é branco lido como zero
+
+`Percentual_Dividend_Yield_Mes` traz **zero em 49,3% das competências** — metade
+do dataset. Não é distribuição zero:
+
+| | |
+|---|---|
+| fundos no informe mensal | 1.575 |
+| nunca publicaram yield > 0 | 682 |
+| **desses, com rendimento declarado no trimestral** | **345** |
+
+O CNPJ `11.769.604/0001-13` tem 44 meses seguidos de yield zero e R$ 152.842.436
+de rendimento declarado. Um fundo que distribui 152 milhões não tem yield zero
+por 44 meses. **O campo simplesmente não é preenchido por boa parte dos
+administradores**, e quem lê zero como "não distribuiu" descarta meio mercado.
+
+Por isso a renda passou a ter resgate pelo informe trimestral nas duas pontas
+da janela — e por isso as duas pontas têm de vir da **mesma base**: o mensal é
+derivado (`yield × VP`), o trimestral é declarado, e medir o pico por um e a
+ponta final por outro faria a diferença sistemática entre as bases aparecer
+como variação de renda que não houve.
+
+### Dois defeitos que só apareceram quando as fontes se encontraram
+
+**O resgate pelo trimestral nunca disparava.** A busca exigia um relatório
+datado em ou depois da última competência mensal, no mesmo ano. O trimestral
+sai com atraso em relação ao mensal, então a condição quase nunca se
+satisfazia. Agora vale o trimestre mais próximo, e a medição mostra que isso é
+seguro: distância mediana de **0 meses**, máxima de **2**.
+
+**`v > 0` confundia "não distribuiu" com "não informou".** O filtro tirava os
+meses zerados da mediana. Para quem paga uma vez por trimestre, a janela
+`[0, 0, X]` tinha a mediana calculada sobre o único mês pago e anualizada por
+doze: 21,60 no lugar de 7,20. A comparação entre as duas fontes achou **34
+fundos com razão próxima de 3**, exatamente essa assinatura.
+
+Razão mensal/trimestral sobre 533 fundos com as duas medidas:
+
+```
+p10 0,797   p25 0,964   mediana 1,008   p75 1,153   p90 2,793
+
+dentro de 5% (concordam)  42,8%
+entre 5% e 25%            28,5%
+perto de 3x                6,4%   <- o defeito acima
+```
+
+A mediana em 1,008 é o que descarta erro de anualização: as duas medidas
+concordam no centro. O que sobra nas caudas é divergência a investigar, não
+defeito de conta.
+
+### O que ficou em aberto, e por quê
+
+- **Mediana ou soma.** Para o pagador irregular cuja janela ainda tem mediana
+  positiva, a mediana superestima frente à soma do período. Trocar uma pela
+  outra acertaria o ritmo e perderia a proteção contra distribuição
+  extraordinária, que `CLAUDE.md` manda não tratar como renda recorrente. É
+  decisão de metodologia, não correção.
+- **A tolerância de 5% do confronto pode estar apertada para este par.** Uma
+  mediana de três meses anualizada por doze e um trimestre anualizado por
+  quatro não medem exatamente o mesmo fato: variação sazonal de distribuição
+  já os separa. Hoje 63 fundos ficam em conflito por isso. O caminho honesto
+  não é afrouxar o limiar, é **comparar como com como** — somar os mesmos três
+  meses e confrontar com o trimestre que os cobre. Não foi feito.
+
 ## O ISIN não é chave confiável entre B3 e CVM
 
 Este era o defeito por trás dos "fundos sem correspondência no cadastro". A
