@@ -11,6 +11,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Os módulos de coleta e triagem rodam direto no Node (strip-types), que
+    // exige a extensão .ts no import. Com noEmit, o tsc aceita a mesma forma e
+    // passa a conferir esses arquivos junto com o app, em vez de recusá-los.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
