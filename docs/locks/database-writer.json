@@ -1,0 +1,8 @@
+{
+  "agent": "claude-code",
+  "migration": "register_qualitative_final_report_v1",
+  "authorized_by": "Fernando",
+  "authorization_reference": "conversa de 04-05/09/2026; autorizacao nominal da migration e do commit do lock direto na main",
+  "started_at": "2026-09-05T00:09:34Z",
+  "expires_at": "2026-09-05T02:09:34Z"
+}
