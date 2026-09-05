@@ -1,5 +1,35 @@
 # HANDOFF — SAFA, contexto para continuar no Claude Code
 
+> **Nota acrescentada em 03/09/2026, na sessão de reconciliação.** O corpo
+> abaixo está preservado como foi escrito e não deve ser editado. Este arquivo
+> vivia solto e não versionado na raiz do repositório; foi trazido para cá sob a
+> convenção de registro legado de `AGENTS.md` §15.
+>
+> Em 05/09/2026 esta passou a ser a **cópia única**. O Codex havia versionado o
+> mesmo conteúdo em `HANDOFF_CLAUDE_CODE.md`, na raiz (PR #2), sem que a sessão
+> de reconciliação soubesse. Os dois corpos foram comparados e são idênticos —
+> 10.421 caracteres, sha256 `23d15f83db5ca74c…` — de modo que a remoção daquele
+> arquivo não descartou conteúdo algum. Manter as duas cópias deixaria uma
+> delas sem as correções abaixo, que é como o erro do D6 se propagou da
+> primeira vez.
+>
+> Dois pontos do texto original **foram superados por verificação posterior** e
+> não devem ser lidos como estado atual:
+>
+> - **§4, item 2** afirma que a `deep_max_v2_1` "passa sem efeito e sem erro".
+>   **É falso.** A migration realmente aplicada tem guarda `raise exception` e
+>   teve efeito: a `deep_max_v2_auditable_analysis` contém
+>   `management_unique_competencies >= 6` e não contém `>= 2`. A afirmação
+>   original julgou a migration pelo arquivo solto `deep_max_v2_1.sql`, cujo
+>   hash difere do texto aplicado. Ver D6 em `DEBITOS_TECNICOS.md`.
+> - **§7, item 2** trata a reconciliação de migrations como pendente. Foi
+>   executada em 03/09/2026; ver `docs/sessions/20260903T210000Z_claude-code.md`.
+>   O SQL fora do livro-razão é **anterior** à adoção do `apply_migration`, e são
+>   11 tabelas fundacionais — não apenas o `qualitative_final_report_v1` citado
+>   no texto original.
+>
+> O restante do documento permanece útil e, no essencial, confirmado.
+
 Documento de passagem. Escrito em 01/09/2026 por Claude (chat), ao fim de uma
 auditoria de leitura, para que outro agente retome o trabalho sem repetir o
 levantamento.

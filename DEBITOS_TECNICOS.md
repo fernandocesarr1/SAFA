@@ -55,30 +55,78 @@ entre critério, documento, página e conclusão.
 
 ## Reprodutibilidade do schema
 
-### D5 — Cinco das seis migrations sem reprodução exata
-| Migration no banco | Situação no repositório |
-|---|---|
-| `deep_max_operational_controls` | sem arquivo idêntico |
-| `deep_max_v2_auditable_analysis` | `deep_max_v2.sql` existe, conteúdo diferente |
-| `deep_max_v2_fk_indexes` | sem arquivo próprio |
-| `prioritized_analysis_universe_v1` | única correspondência exata |
-| `deep_max_v2_1` | arquivo existe, SQL diferente do aplicado |
-| `source_documents_multi_event_v1` | arquivo existe, altera índices diferentes |
+### D5 — ~~Cinco das seis migrations sem reprodução exata~~ · PARCIALMENTE RESOLVIDO em 03/09/2026
+Estado original: cinco das seis migrations não tinham reprodução exata no
+repositório, que sequer possuía `supabase/migrations/`.
 
-Além disso: `qualitative_final_report_v1.sql` está no repositório e seus objetos
-estão no banco, **mas não há migration correspondente no livro-razão**.
+**Resolvido na sessão de reconciliação de 03/09/2026:** as seis migrations foram
+extraídas de `supabase_migrations.schema_migrations` — que guarda o texto
+literalmente executado por `apply_migration` — e gravadas em
+`supabase/migrations/<versão>_<nome>.sql`. O hash de cada arquivo confere byte a
+byte com o registro do banco; a conferência está no registro da sessão e no
+`README.md` do diretório. Os arquivos soltos foram para `supabase/snapshots/`
+sem exclusão, com seu status probatório documentado. `.gitattributes` fixa
+`*.sql text eol=lf`, sem o que o checkout no Windows grava CRLF e nenhuma
+comparação de hash confere.
 
-O repositório não possui `supabase/migrations/`. Os arquivos estão soltos em
-`supabase/`, misturando snapshots, scripts de implantação e SQL aplicado.
+A auditoria de nomes contra hash confirmou a tabela original em cheio: dos
+quatro arquivos com nome de migration, só `prioritized_analysis_universe_v1.sql`
+conferia.
 
-### D6 — `deep_max_v2.sql` editado retroativamente
-O limiar de relatórios gerenciais foi alterado de 6 para 2 dentro de arquivo que
-representa migration já aplicada. A `deep_max_v2_1` faz cirurgia textual (lê a
-definição da view e troca `>= 6` por `>= 2`); numa recriação limpa o texto já
-está em 2, a troca não encontra nada e **a migration passa sem efeito e sem erro**.
+**Replay verificado em 04/09/2026.** As 11 tabelas fundacionais sem `create
+table` no livro-razão — `instruments`, `analysis_runs`, `analysis_sections`,
+`source_documents`, `metric_definitions`, `metric_observations`,
+`cash_distributions`, `market_prices`, `material_events`, `ranking_snapshots`,
+`ranking_entries` — foram criadas antes de o projeto adotar `apply_migration`.
+**O SQL fora do livro-razão é anterior a ele, não posterior.** Reconstruídas em
+`00000000000000_baseline_pre_ledger.sql`; o órfão `qualitative_final_report_v1`,
+em `99999999999999_qualitative_final_report_out_of_ledger.sql`. Nenhuma linha
+foi inserida no livro-razão para representá-los.
 
-O problema aqui é de **reprodutibilidade e técnica de migration**, não de mérito
-da decisão — ver D7.
+Replay em Postgres 17.2 limpo (produção roda 17.6.1): os oito arquivos aplicam
+sem erro e produzem assinatura estrutural equivalente à de produção — 938 linhas
+dos dois lados, 936 idênticas, cobrindo colunas, constraints, índices, triggers,
+funções, políticas, RLS e definição das views. As duas diferenças são um par de
+parênteses externos na reconstrução de dois `CHECK` de `ranking_entries`,
+idênticas ignorando agrupamento; normalização de deparse entre versões.
+
+O replay achou um defeito real e o corrigiu: as colunas `final_report*` estavam
+no baseline e faziam `v_analysis_queue` — criada com `select candidate.*`, que
+congela a lista de colunas — sair com quatro colunas a mais. Foram movidas para
+o arquivo do órfão, que roda depois das seis migrations. **É a demonstração de
+por que baseline sem replay não vale: a inspeção não teria pego isso.**
+
+**Permanece em aberto:**
+
+- `qualitative_final_report_v1` segue sem registro do texto executado. O arquivo
+  reproduz o estado vivo e foi verificado por replay, mas não há prova de que
+  seja idêntico ao SQL originalmente aplicado, e ele continua ausente do
+  livro-razão. Formalizá-lo exige aplicar migration em produção — decisão de
+  Fernando, não ação técnica neutra.
+- As 11 fundacionais permanecem sem texto de origem. Isso é irrecuperável: o
+  SQL não foi preservado. A garantia disponível é de resultado, não de origem.
+
+### D6 — ~~`deep_max_v2.sql` editado retroativamente~~ · REESCRITO em 03/09/2026
+Cirurgia textual sobre definição de view: a `deep_max_v2_1` lê a definição com
+`pg_get_viewdef`, troca `management_unique_competencies >= 6` por `>= 2` e
+recria a view. **Hoje está protegida por guarda e funcionando** — a migration
+tem `raise exception` caso a substituição não encontre o alvo, de modo que
+falharia alto, não em silêncio.
+
+**Não é no-op.** Verificado: a `deep_max_v2_auditable_analysis` contém `>= 6` e
+não contém `>= 2`; a substituição encontrou o alvo e teve efeito.
+
+A dívida que permanece é de técnica: **substituir por recriação integral do
+objeto na próxima vez que a view for tocada**, conforme `AGENTS.md` §9.3.
+
+> *Correção:* a formulação anterior afirmava que a migration passava sem efeito
+> e sem erro. Ela julgou a migration pelo **arquivo solto**
+> (`deep_max_v2_1.sql`, hash `e4b73be4…`), que de fato não tem a guarda — e não
+> pelo SQL aplicado, registrado no livro-razão com hash `b24e3a13…`. São textos
+> diferentes. É exatamente o defeito que o D5 descreve, aplicado contra quem o
+> escreveu.
+
+O mérito da decisão de 6 para 2 é assunto do D7, e está ratificado.
 
 ### D7 — ~~Redução de rigor sem decisão~~ · RATIFICADA
 A redução de 6 para 2 relatórios gerenciais foi **determinada expressamente por
@@ -211,6 +259,47 @@ desativado. Não rodar `drizzle-kit`. Avaliar remoção.
 
 > *Correção:* a formulação original dizia "mal configurado contra o Postgres".
 > Errado: o dialeto está correto para o que o scaffold é.
+
+---
+
+## Trabalho preparado e ainda NÃO integrado
+
+Adicionado em 05/09/2026. **Nenhum item abaixo resolve dívida ainda**: o código
+existe, tem teste e não está ligado ao app nem ao banco. Registrado aqui para
+não parecer feito.
+
+### O achado que motivou
+
+A arquitetura não alcança o objetivo declarado do SAFA — varrer o mercado de
+FIIs — e o motivo é aritmético, não de esforço. O Deep Max exige 16 seções, 100
+critérios e leitura documental integral em duas passagens por fundo. Saíram duas
+análises em dois dias; o mercado tem centenas de fundos. Nenhum ganho de
+produtividade fecha essa conta.
+
+A correção é separar varredura de análise profunda, em funil de quatro
+estágios, com triagem quantitativa automática antes do Deep Max. Desenho em
+`docs/arquitetura/funil-de-triagem.md`.
+
+### O que já existe
+
+| Módulo | Ataca | Estado |
+|---|---|---|
+| `lib/coleta/cotahist/` | D1 | parser do registro de 245 posições, com rejeição explícita e precisão de 2 casas. **Falta o download e a descompactação.** |
+| `lib/coleta/lote.ts` | D1, D3, D12 | linhagem obrigatória: URL que identifique o arquivo, hash, versão do parser, contagem |
+| `lib/triagem/` | escalabilidade, D4 | decomposição `ln(P1/P0) = ln(R1/R0) − ln(Y1/Y0)` e sinais de deterioração com estado `desconhecido` |
+| `lib/metodologia/yield-exigido.ts` | D9, D10 | NTN-B + prêmio + ajustes, cada linha com fonte; cap rate sobre renda real declarado por escrito |
+| `supabase/propostas/` | D1, D4 | SQL de lotes e triagem, **não aplicado** |
+
+32 testes de comportamento passando (`npm run test:unit`).
+
+### O que impede de valer
+
+1. **Nada está integrado.** O app não lê nada disso; o banco não tem as tabelas.
+2. **Falta o coletor de proventos (FNET).** Sem ele, a renda usada na
+   decomposição continua vindo dos dados que o D1 manda rejeitar.
+3. **A triagem não roda sozinha** — falta o orquestrador que percorre o universo.
+4. **Rodar a triagem sobre os dados atuais herdaria o D1** e daria aparência
+   quantitativa a dado sem procedência, que é pior do que não ter triagem.
 
 ---
 

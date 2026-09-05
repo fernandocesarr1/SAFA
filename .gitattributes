@@ -1,0 +1,7 @@
+# Fim de linha normalizado para SQL.
+#
+# Sem isto, o checkout no Windows (core.autocrlf=true) grava CRLF e o hash do
+# arquivo em disco deixa de bater com o texto registrado em
+# supabase_migrations.schema_migrations, envenenando toda comparação de
+# migration exigida por AGENTS.md §5.4.
+*.sql text eol=lf
